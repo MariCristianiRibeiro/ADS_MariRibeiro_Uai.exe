@@ -13,7 +13,7 @@ class ParticipantController extends Controller
 {
     public function index(Request $request): View
     {
-        $query = Participant::with('user')
+        $query = Participant::with(['user.supervisors'])
             ->where('user_id', Auth::id())
             ->latest();
 

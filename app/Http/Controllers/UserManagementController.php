@@ -16,7 +16,7 @@ class UserManagementController extends Controller
 {
     public function index(Request $request): View
     {
-        $query = User::latest();
+        $query = User::with(['supervisors' => fn ($query) => $query->orderBy('name')])->latest();
 
         if ($request->filled('search')) {
             $search = trim($request->search);

@@ -47,6 +47,17 @@
             @endif
         </div>
 
+        <div>
+            <x-input-label value="{{ __('Superiores responsáveis') }}" />
+            <div class="mt-1 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                @forelse ($user->supervisors as $supervisor)
+                    <div>{{ $supervisor->name }}</div>
+                @empty
+                    <span class="text-gray-500">Nenhum superior cadastrado.</span>
+                @endforelse
+            </div>
+        </div>
+
         <div class="flex items-center gap-4">
             <x-primary-button>{{ __('Salvar') }}</x-primary-button>
 

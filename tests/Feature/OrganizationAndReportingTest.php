@@ -51,6 +51,24 @@ it('allows only admin and hr to manage the people directory', function () {
         ->assertForbidden();
 });
 
+it('shows up to two supervisors beside the profile in the people directory', function () {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $manager = User::factory()->create(['name' => 'Carlos Gerente', 'role' => 'manager']);
+    $director = User::factory()->create(['name' => 'Ana Diretora', 'role' => 'director_network']);
+    $participant = User::factory()->create(['role' => 'participant']);
+    $participant->supervisors()->attach([
+        $manager->id => ['relationship_type' => 'manager_collaborator'],
+        $director->id => ['relationship_type' => 'network_director_collaborator'],
+    ]);
+
+    $this->actingAs($admin)
+        ->get('/users')
+        ->assertOk()
+        ->assertSeeInOrder(['Perfil', 'Superior responsável 1', 'Superior responsável 2'])
+        ->assertSee('Carlos Gerente')
+        ->assertSee('Ana Diretora');
+});
+
 it('supports optional and multiple hierarchical supervisors', function () {
     $admin = User::factory()->create(['role' => 'admin']);
     $directorA = User::factory()->create(['role' => 'director_network']);

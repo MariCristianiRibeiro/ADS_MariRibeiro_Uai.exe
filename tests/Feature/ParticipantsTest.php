@@ -60,6 +60,37 @@ it('only shows the authenticated user participants and searches by name', functi
         ->assertDontSee('Carlos Lima');
 });
 
+it('shows the participant supervisors in the management table', function () {
+    $owner = User::factory()->create(['name' => 'Maria Colaboradora', 'role' => 'participant']);
+    $manager = User::factory()->create(['name' => 'Carlos Gerente', 'role' => 'manager']);
+    $owner->supervisors()->attach($manager->id, ['relationship_type' => 'manager_collaborator']);
+
+    Participant::create([
+        'user_id' => $owner->id,
+        'name' => 'Maria Colaboradora',
+        'email' => 'maria@empresa.com',
+        'status' => 'active',
+    ]);
+
+    $this->actingAs($owner)
+        ->get('/participants')
+        ->assertOk()
+        ->assertSee('Superior responsável')
+        ->assertSee('Carlos Gerente');
+});
+
+it('shows the authenticated user supervisors in the profile page', function () {
+    $user = User::factory()->create(['name' => 'Maria Colaboradora', 'role' => 'participant']);
+    $manager = User::factory()->create(['name' => 'Carlos Gerente', 'role' => 'manager']);
+    $user->supervisors()->attach($manager->id, ['relationship_type' => 'manager_collaborator']);
+
+    $this->actingAs($user)
+        ->get('/profile')
+        ->assertOk()
+        ->assertSee('Superiores responsáveis')
+        ->assertSee('Carlos Gerente');
+});
+
 it('registering a user also creates a participant profile for the same account', function () {
     $this->post('/register', [
         'name' => 'Ana Souza',
