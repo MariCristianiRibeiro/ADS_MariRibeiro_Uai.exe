@@ -13,19 +13,26 @@ uses(RefreshDatabase::class);
 
 it('calculates real project cost for a manager without exposing individual rates', function () {
     $manager = User::factory()->create(['role' => 'manager']);
-    $member = User::factory()->create(['role' => 'participant']);
+    $member = User::factory()->create(['role' => 'participant', 'salary' => 44000]);
     $directorate = Directorate::create(['name' => 'Operações', 'code' => 'OPS']);
     $team = Team::create(['directorate_id' => $directorate->id, 'manager_id' => $manager->id, 'name' => 'Produto', 'code' => 'PROD']);
     $position = JobPosition::create(['name' => 'Analista', 'code' => 'ANL', 'hourly_rate' => 100]);
     $member->update(['team_id' => $team->id, 'job_position_id' => $position->id]);
+    $member->forceFill(['salary' => 44000])->save();
     $project = Project::create(['team_id' => $team->id, 'name' => 'Portal', 'code' => 'PORTAL']);
-    $participant = Participant::create(['user_id' => $manager->id, 'member_user_id' => $member->id, 'name' => $member->name, 'email' => $member->email, 'status' => 'active']);
-    $meeting = Meeting::create(['user_id' => $manager->id, 'project_id' => $project->id, 'title' => 'Planejamento', 'date' => now()->toDateString(), 'duration_minutes' => 60, 'status' => 'completed']);
-    $meeting->participants()->attach($participant);
+    $participant = Participant::create(['user_id' => $manager->id, 'member_user_id' => $member->id, 'name' => $member->name, 'email' => $member->email, 'status' => 'active', 'salary' => 44000]);
+    $participant->forceFill(['salary' => 44000])->save();
+    $meeting = Meeting::create(['user_id' => $manager->id, 'project_id' => $project->id, 'title' => 'Planejamento', 'date' => now()->toDateString(), 'duration_minutes' => 120, 'actual_duration_seconds' => 1800, 'status' => 'completed']);
+    $meeting->participants()->attach($participant, ['attendance_status' => 'confirmed']);
 
     $response = $this->actingAs($manager)->getJson('/reports/meetings');
 
-    $response->assertOk()->assertJsonPath('visibility', 'real_cost')->assertJsonPath('rows.0.real_cost', 100);
+    $response->assertOk()
+        ->assertJsonPath('visibility', 'real_cost')
+        ->assertJsonPath('rows.0.planned_hours', 2)
+        ->assertJsonPath('rows.0.actual_hours', 0.5)
+        ->assertJsonPath('rows.0.estimated_cost', 200)
+        ->assertJsonPath('rows.0.real_cost', 50);
 });
 
 it('does not expose real cost to a collaborator', function () {
@@ -34,6 +41,27 @@ it('does not expose real cost to a collaborator', function () {
     $this->actingAs($user)->getJson('/reports/meetings')
         ->assertOk()
         ->assertJsonPath('visibility', 'hours')
+        ->assertJsonMissingPath('real_cost');
+});
+
+it('reports planned hours separately from confirmed actual attendance hours to collaborators', function () {
+    $owner = User::factory()->create(['role' => 'manager']);
+    $member = User::factory()->create(['role' => 'participant']);
+    $meeting = Meeting::create([
+        'user_id' => $owner->id,
+        'title' => 'Acompanhamento',
+        'date' => now()->toDateString(),
+        'duration_minutes' => 90,
+        'actual_duration_seconds' => 1800,
+        'status' => 'completed',
+    ]);
+    $meeting->users()->attach($member, ['attendance_status' => 'confirmed']);
+
+    $this->actingAs($member)->getJson('/reports/meetings')
+        ->assertOk()
+        ->assertJsonPath('hours', 1.5)
+        ->assertJsonPath('planned_hours', 1.5)
+        ->assertJsonPath('actual_hours', 0.5)
         ->assertJsonMissingPath('real_cost');
 });
 

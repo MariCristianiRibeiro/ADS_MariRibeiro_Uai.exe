@@ -1,49 +1,62 @@
-export default (initialParticipants = []) => ({
-    participants: initialParticipants.map((participant) => ({
+export default (initialParticipants = [], initialElapsedSeconds = null, initialDurationMinutes = 60, includePendingAttendance = false) => ({
+    availableParticipants: initialParticipants.map((participant) => ({
         ...participant,
-        accumulatedCost: Number(participant.accumulatedCost || 0),
-        isActive: participant.isActive !== false,
+        hourlyRate: Number(participant.hourlyRate || 0),
     })),
-    durationMinutes: 60,
-    elapsedSeconds: 0,
+    participants: initialParticipants.filter((participant) => participant.isSelected).map((participant) => ({
+        ...participant,
+        hourlyRate: Number(participant.hourlyRate || 0),
+    })),
+    durationMinutes: Number(initialDurationMinutes || 60),
+    elapsedSeconds: Number(initialElapsedSeconds || 0),
+    hasStarted: initialElapsedSeconds !== null,
+    includePendingAttendance,
     isRunning: false,
     interval: null,
+    startedAt: null,
 
     get projectedCost() {
         return this.participants.reduce((total, participant) => total + this.hourlyRate(participant), 0) * (this.durationMinutes / 60);
     },
 
     get liveCost() {
-        return this.participants.reduce((total, participant) => total + participant.accumulatedCost, 0);
+        const hourlyRate = this.participants.reduce(
+            (total, participant) => total + (participant.attendanceStatus === 'confirmed' || this.includePendingAttendance ? participant.hourlyRate : 0),
+            0,
+        );
+        return hourlyRate * (this.elapsedSeconds / 3600);
     },
 
     hourlyRate(participant) {
-        if (participant.type === 'internal') return Number(participant.salary || 0) / 220;
-        if (participant.type === 'external') return Number(participant.hourlyRate || 0);
-        return 0;
+        return participant.hourlyRate;
+    },
+
+    selectParticipants(ids) {
+        const attendanceById = new Map(this.participants.map((participant) => [participant.id, participant.attendanceStatus]));
+        this.participants = this.availableParticipants
+            .filter((participant) => ids.includes(participant.id))
+            .map((participant) => ({
+                ...participant,
+                attendanceStatus: attendanceById.get(participant.id) || participant.attendanceStatus,
+            }));
+    },
+
+    setAttendanceStatus(id, status) {
+        const participant = this.participants.find((candidate) => candidate.id === id);
+        if (participant) participant.attendanceStatus = status;
     },
 
     start() {
         if (this.isRunning) return;
+        this.hasStarted = true;
+        this.startedAt = Date.now() - this.elapsedSeconds * 1000;
         this.isRunning = true;
-        this.interval = window.setInterval(() => this.tick(), 1000);
-    },
-
-    pause() {
-        this.isRunning = false;
-        window.clearInterval(this.interval);
-        this.interval = null;
+        this.tick();
+        this.interval = window.setInterval(() => this.tick(), 250);
     },
 
     tick() {
-        this.elapsedSeconds += 1;
-        this.participants.forEach((participant) => {
-            if (participant.isActive) participant.accumulatedCost += this.hourlyRate(participant) / 3600;
-        });
-    },
-
-    remove(participant) {
-        participant.isActive = false;
+        this.elapsedSeconds = Math.floor((Date.now() - this.startedAt) / 1000);
     },
 
     formatCurrency(value) {

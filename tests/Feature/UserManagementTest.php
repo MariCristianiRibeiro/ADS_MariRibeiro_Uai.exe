@@ -76,4 +76,9 @@ it('user can update user status from management screen', function () {
         'status' => 'active',
         'role' => 'participant',
     ]);
+
+    $this->assertDatabaseMissing('users', [
+        'id' => $user->id,
+        'salary' => '7500.00',
+    ]);
 });

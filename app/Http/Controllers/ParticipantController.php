@@ -57,7 +57,6 @@ class ParticipantController extends Controller
             'status' => ['required', 'in:active,inactive,pending'],
             'type' => ['required', 'in:internal,external,guest'],
             'hourly_rate' => ['nullable', 'numeric', 'min:0'],
-            'salary' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
         ]);
 
@@ -92,7 +91,6 @@ class ParticipantController extends Controller
             'status' => ['required', 'in:active,inactive,pending'],
             'type' => ['required', 'in:internal,external,guest'],
             'hourly_rate' => ['nullable', 'numeric', 'min:0'],
-            'salary' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
         ]);
 

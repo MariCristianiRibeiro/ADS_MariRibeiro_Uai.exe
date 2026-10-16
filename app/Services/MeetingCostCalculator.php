@@ -35,6 +35,27 @@ class MeetingCostCalculator
     {
         $meeting->loadMissing('users.jobPosition', 'participants.memberUser.jobPosition');
 
+        if ($meeting->actual_duration_seconds === null) {
+            return 0;
+        }
+
+        $actualHours = $meeting->actual_duration_seconds / 3600;
+
+        if ($meeting->users->isNotEmpty()) {
+            return $meeting->users->sum(fn (User $user) => $user->pivot->attendance_status === 'confirmed'
+                ? $actualHours * $this->userRate($user)
+                : 0);
+        }
+
+        return $meeting->participants->sum(fn (Participant $participant) => $participant->pivot->attendance_status === 'confirmed'
+            ? $actualHours * $this->participantRate($participant)
+            : 0);
+    }
+
+    public function estimatedTotal(Meeting $meeting): float
+    {
+        $meeting->loadMissing('users.jobPosition', 'participants.memberUser.jobPosition');
+
         if ($meeting->users->isNotEmpty()) {
             return $meeting->users->sum(fn (User $user) => $this->userCost($meeting, $user));
         }

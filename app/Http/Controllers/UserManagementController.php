@@ -100,7 +100,6 @@ class UserManagementController extends Controller
             'supervisor_ids' => ['nullable', 'array', 'max:2'],
             'supervisor_ids.*' => ['nullable', 'integer', 'exists:users,id', 'different:' . $user->id],
             'hourly_rate' => ['nullable', 'numeric', 'min:0'],
-            'salary' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $supervisorIds = collect($validated['supervisor_ids'] ?? [])->unique()->values();

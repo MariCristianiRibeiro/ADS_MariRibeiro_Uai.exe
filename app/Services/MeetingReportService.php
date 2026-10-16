@@ -33,18 +33,29 @@ class MeetingReportService
             })
             ->where('status', '!=', 'canceled')
             ->whereDate('date', '>=', now()->toDateString())
-            ->with('project')
+            ->with(['project', 'users', 'participants'])
             ->get();
 
-        $hours = $meetings->sum(fn (Meeting $meeting) => $meeting->duration_minutes / 60);
+        $plannedHours = $meetings->sum(fn (Meeting $meeting) => $meeting->duration_minutes / 60);
+        $actualHoursFor = fn (Collection $projectMeetings) => $projectMeetings->sum(
+            fn (Meeting $meeting) => $meeting->actual_duration_seconds !== null
+                && ($meeting->users->contains(fn (User $attendee) => $attendee->id === $user->id && $attendee->pivot->attendance_status === 'confirmed')
+                    || $meeting->participants->contains(fn ($participant) => $participant->member_user_id === $user->id && $participant->pivot->attendance_status === 'confirmed'))
+                    ? $meeting->actual_duration_seconds / 3600
+                    : 0,
+        );
 
         return [
             'visibility' => $meetings->count() >= 4 ? 'estimated_hours' : 'hours',
             'future_meetings' => $meetings->count(),
-            'hours' => round($hours, 2),
+            'hours' => round($plannedHours, 2),
+            'planned_hours' => round($plannedHours, 2),
+            'actual_hours' => round($actualHoursFor($meetings), 2),
             'rows' => $meetings->groupBy('project_id')->map(fn (Collection $projectMeetings) => [
                 'project' => $projectMeetings->first()->project?->name ?? 'Sem projeto',
                 'hours' => round($projectMeetings->sum(fn (Meeting $meeting) => $meeting->duration_minutes / 60), 2),
+                'planned_hours' => round($projectMeetings->sum(fn (Meeting $meeting) => $meeting->duration_minutes / 60), 2),
+                'actual_hours' => round($actualHoursFor($projectMeetings), 2),
             ])->values()->all(),
         ];
     }
@@ -87,6 +98,9 @@ class MeetingReportService
                 'directorate' => $first->project?->team?->directorate?->name,
                 'meetings' => $projectMeetings->count(),
                 'hours' => round($projectMeetings->sum(fn (Meeting $meeting) => $meeting->duration_minutes / 60), 2),
+                'planned_hours' => round($projectMeetings->sum(fn (Meeting $meeting) => $meeting->duration_minutes / 60), 2),
+                'actual_hours' => round($projectMeetings->sum(fn (Meeting $meeting) => ($meeting->actual_duration_seconds ?? 0) / 3600), 2),
+                'estimated_cost' => round($projectMeetings->sum(fn (Meeting $meeting) => $this->costs->estimatedTotal($meeting)), 2),
                 'real_cost' => round($projectMeetings->sum(fn (Meeting $meeting) => $this->costs->total($meeting)), 2),
             ];
         })->values()->all();

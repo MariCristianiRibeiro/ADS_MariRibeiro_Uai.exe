@@ -40,6 +40,64 @@ it('user can create a meeting', function () {
     ]);
 });
 
+it('stores actual meeting time and attendance confirmation separately from planned time', function () {
+    $owner = User::factory()->create(['role' => 'manager']);
+    $attendee = User::factory()->create(['role' => 'participant']);
+
+    $this->actingAs($owner)
+        ->post('/meetings', [
+            'title' => 'Reunião com chamada',
+            'date' => '2026-09-15',
+            'duration_minutes' => 90,
+            'actual_duration_seconds' => 3665,
+            'status' => 'completed',
+            'participants' => [$attendee->id],
+            'attendance' => [$attendee->id => 'confirmed'],
+        ])
+        ->assertRedirect('/meetings');
+
+    $meeting = \App\Models\Meeting::where('title', 'Reunião com chamada')->firstOrFail();
+
+    expect($meeting->duration_minutes)->toBe(90)
+        ->and($meeting->actual_duration_seconds)->toBe(3665);
+
+    $this->assertDatabaseHas('meeting_user', [
+        'meeting_id' => $meeting->id,
+        'user_id' => $attendee->id,
+        'attendance_status' => 'confirmed',
+    ]);
+
+    $this->actingAs($owner)
+        ->get('/meetings/' . $meeting->id . '/edit')
+        ->assertOk()
+        ->assertSee('Chamada de presença')
+        ->assertSee('Presença confirmada')
+        ->assertSee('Tempo realizado')
+        ->assertDontSee('Pausar');
+
+    $this->actingAs($owner)
+        ->get('/meetings/create')
+        ->assertOk()
+        ->assertSee('Duração prevista (minutos)')
+        ->assertSee('Iniciar cronômetro')
+        ->assertDontSee('Pausar');
+});
+
+it('rejects invalid attendance statuses', function () {
+    $owner = User::factory()->create(['role' => 'manager']);
+    $attendee = User::factory()->create(['role' => 'participant']);
+
+    $this->actingAs($owner)
+        ->post('/meetings', [
+            'title' => 'Reunião com status inválido',
+            'date' => '2026-09-15',
+            'status' => 'scheduled',
+            'participants' => [$attendee->id],
+            'attendance' => [$attendee->id => 'maybe'],
+        ])
+        ->assertSessionHasErrors('attendance.' . $attendee->id);
+});
+
 it('user can attach participants to a meeting', function () {
     $user = User::factory()->create();
     $participantA = Participant::create([

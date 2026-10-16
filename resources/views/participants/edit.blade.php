@@ -52,9 +52,10 @@
                             </select>
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div><label for="salary" class="block text-sm font-medium text-gray-700">Salário mensal</label><input id="salary" name="salary" type="number" step="0.01" min="0" value="{{ old('salary', $participant->salary) }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div>
-                            <div><label for="hourly_rate" class="block text-sm font-medium text-gray-700">Valor-hora customizado</label><input id="hourly_rate" name="hourly_rate" type="number" step="0.01" min="0" value="{{ old('hourly_rate', $participant->hourly_rate) }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div>
+                        <div>
+                            <label for="hourly_rate" class="block text-sm font-medium text-gray-700">Custo por hora (R$)</label>
+                            <input id="hourly_rate" name="hourly_rate" type="number" step="0.01" min="0" value="{{ old('hourly_rate', $participant->hourly_rate) }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                            @error('hourly_rate') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
                         </div>
 
                         <div>

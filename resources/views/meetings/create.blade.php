@@ -10,6 +10,7 @@
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
                 <form method="POST" action="{{ route('meetings.store') }}">
                     @csrf
+                    @php $selectedMemberIds = collect(old('participants', []))->map(fn ($id) => (int) $id)->all(); @endphp
 
                     <div class="grid grid-cols-1 gap-6">
                         <div>
@@ -18,9 +19,14 @@
                             @error('title') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div><label for="project_id" class="block text-sm font-medium text-gray-700">Projeto</label><select id="project_id" name="project_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"><option value="">Sem projeto</option>@foreach ($projects as $project)<option value="{{ $project->id }}" {{ old('project_id') == $project->id ? 'selected' : '' }}>{{ $project->name }} ({{ $project->code }})</option>@endforeach</select></div>
-                            <div><label for="duration_minutes" class="block text-sm font-medium text-gray-700">Duração (minutos)</label><input id="duration_minutes" name="duration_minutes" type="number" min="1" max="1440" value="{{ old('duration_minutes', 60) }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">@error('duration_minutes') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror</div>
+                        <div>
+                            <label for="project_id" class="block text-sm font-medium text-gray-700">Projeto</label>
+                            <select id="project_id" name="project_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                                <option value="">Sem projeto</option>
+                                @foreach ($projects as $project)
+                                    <option value="{{ $project->id }}" {{ old('project_id') == $project->id ? 'selected' : '' }}>{{ $project->name }} ({{ $project->code }})</option>
+                                @endforeach
+                            </select>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -57,9 +63,9 @@
 
                         <div>
                             <label for="participants" class="block text-sm font-medium text-gray-700">Usuários participantes</label>
-                            <select id="participants" name="participants[]" multiple class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <select id="participants" name="participants[]" multiple x-on:change="$dispatch('meeting-participants-changed', { ids: Array.from($event.target.selectedOptions, option => Number(option.value)) })" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 @foreach ($members as $member)
-                                    <option value="{{ $member->id }}" {{ in_array($member->id, old('participants', []), true) ? 'selected' : '' }}>
+                                    <option value="{{ $member->id }}" {{ in_array($member->id, $selectedMemberIds, true) ? 'selected' : '' }}>
                                         {{ $member->name }} - {{ ['executive' => 'Executiva', 'director_commercial' => 'Diretor Comercial', 'director_network' => 'Diretor de Rede', 'manager' => 'Gestor', 'participant' => 'Colaborador'][$member->role] ?? $member->role }}
                                     </option>
                                 @endforeach
@@ -73,7 +79,7 @@
                             @error('notes') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
                         </div>
 
-                        @include('meetings._timer', ['selectedParticipantIds' => old('participants', [])])
+                        @include('meetings._timer', ['selectedParticipantIds' => $selectedMemberIds])
                     </div>
 
                     <div class="mt-6 flex justify-end gap-3">

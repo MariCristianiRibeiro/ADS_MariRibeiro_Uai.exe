@@ -21,7 +21,6 @@ class Participant extends Model
         'type',
         'role',
         'hourly_rate',
-        'salary',
         'notes',
     ];
 
@@ -39,7 +38,6 @@ class Participant extends Model
     {
         return [
             'hourly_rate' => 'decimal:2',
-            'salary' => 'decimal:2',
         ];
     }
 

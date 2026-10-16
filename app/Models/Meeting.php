@@ -18,6 +18,7 @@ class Meeting extends Model
         'date',
         'time',
         'duration_minutes',
+        'actual_duration_seconds',
         'location',
         'status',
         'notes',
@@ -27,6 +28,7 @@ class Meeting extends Model
         'date' => 'date',
         'time' => 'string',
         'duration_minutes' => 'integer',
+        'actual_duration_seconds' => 'integer',
     ];
 
     public function user(): BelongsTo
@@ -36,12 +38,12 @@ class Meeting extends Model
 
     public function participants(): BelongsToMany
     {
-        return $this->belongsToMany(Participant::class)->withTimestamps();
+        return $this->belongsToMany(Participant::class)->withPivot('attendance_status')->withTimestamps();
     }
 
     public function users(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'meeting_user')->withTimestamps();
+        return $this->belongsToMany(User::class, 'meeting_user')->withPivot('attendance_status')->withTimestamps();
     }
 
     public function project(): BelongsTo
