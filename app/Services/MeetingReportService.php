@@ -8,9 +8,7 @@ use Illuminate\Support\Collection;
 
 class MeetingReportService
 {
-    public function __construct(private readonly MeetingCostCalculator $costs)
-    {
-    }
+    public function __construct(private readonly MeetingCostCalculator $costs) {}
 
     public function for(User $user): array
     {
@@ -37,13 +35,14 @@ class MeetingReportService
             ->get();
 
         $plannedHours = $meetings->sum(fn (Meeting $meeting) => $meeting->duration_minutes / 60);
-        $actualHoursFor = fn (Collection $projectMeetings) => $projectMeetings->sum(
-            fn (Meeting $meeting) => $meeting->actual_duration_seconds !== null
+        $actualSecondsFor = fn (Collection $projectMeetings): int => $projectMeetings->sum(
+            fn (Meeting $meeting): int => $meeting->actual_duration_seconds !== null
                 && ($meeting->users->contains(fn (User $attendee) => $attendee->id === $user->id && $attendee->pivot->attendance_status === 'confirmed')
                     || $meeting->participants->contains(fn ($participant) => $participant->member_user_id === $user->id && $participant->pivot->attendance_status === 'confirmed'))
-                    ? $meeting->actual_duration_seconds / 3600
+                    ? $meeting->actual_duration_seconds
                     : 0,
         );
+        $actualHoursFor = fn (Collection $projectMeetings): float => $actualSecondsFor($projectMeetings) / 3600;
 
         return [
             'visibility' => $meetings->count() >= 4 ? 'estimated_hours' : 'hours',
@@ -51,11 +50,13 @@ class MeetingReportService
             'hours' => round($plannedHours, 2),
             'planned_hours' => round($plannedHours, 2),
             'actual_hours' => round($actualHoursFor($meetings), 2),
+            'actual_seconds' => $actualSecondsFor($meetings),
             'rows' => $meetings->groupBy('project_id')->map(fn (Collection $projectMeetings) => [
                 'project' => $projectMeetings->first()->project?->name ?? 'Sem projeto',
                 'hours' => round($projectMeetings->sum(fn (Meeting $meeting) => $meeting->duration_minutes / 60), 2),
                 'planned_hours' => round($projectMeetings->sum(fn (Meeting $meeting) => $meeting->duration_minutes / 60), 2),
                 'actual_hours' => round($actualHoursFor($projectMeetings), 2),
+                'actual_seconds' => $actualSecondsFor($projectMeetings),
             ])->values()->all(),
         ];
     }
@@ -71,6 +72,7 @@ class MeetingReportService
         if ($user->role === 'manager') {
             $query->where(function ($scope) use ($user, $subordinateIds) {
                 $scope->whereHas('project.team', fn ($team) => $team->where('manager_id', $user->id))
+                    ->orWhereHas('project', fn ($projects) => $projects->where('manager_id', $user->id))
                     ->orWhereHas('users', fn ($users) => $users->whereIn('users.id', $subordinateIds))
                     ->orWhereHas('participants', fn ($participants) => $participants->whereIn('participants.member_user_id', $subordinateIds));
             });
@@ -100,6 +102,7 @@ class MeetingReportService
                 'hours' => round($projectMeetings->sum(fn (Meeting $meeting) => $meeting->duration_minutes / 60), 2),
                 'planned_hours' => round($projectMeetings->sum(fn (Meeting $meeting) => $meeting->duration_minutes / 60), 2),
                 'actual_hours' => round($projectMeetings->sum(fn (Meeting $meeting) => ($meeting->actual_duration_seconds ?? 0) / 3600), 2),
+                'actual_seconds' => $projectMeetings->sum(fn (Meeting $meeting) => $meeting->actual_duration_seconds ?? 0),
                 'estimated_cost' => round($projectMeetings->sum(fn (Meeting $meeting) => $this->costs->estimatedTotal($meeting)), 2),
                 'real_cost' => round($projectMeetings->sum(fn (Meeting $meeting) => $this->costs->total($meeting)), 2),
             ];

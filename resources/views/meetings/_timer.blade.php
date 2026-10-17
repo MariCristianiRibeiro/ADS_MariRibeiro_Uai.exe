@@ -4,7 +4,7 @@
         ->map(fn ($member) => [
             'id' => $member->id,
             'name' => $member->name,
-            'hourlyRate' => (float) ($member->jobPosition?->hourly_rate ?? $member->hourly_rate ?? 0),
+            'hourlyRate' => (float) ($member->jobPosition?->hourly_rate ?? $member->hourly_rate ?? $member->participantProfile?->hourly_rate ?? 0),
             'isSelected' => in_array($member->id, $selectedParticipantIds, true),
             'attendanceStatus' => old('attendance.' . $member->id, ($meeting ?? null)?->users?->firstWhere('id', $member->id)?->pivot?->attendance_status ?? 'pending'),
         ])->values();

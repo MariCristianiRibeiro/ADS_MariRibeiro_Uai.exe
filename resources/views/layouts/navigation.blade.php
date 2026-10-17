@@ -23,6 +23,14 @@
                     <x-nav-link :href="route('meetings.index')" :active="request()->routeIs('meetings.*')">
                         {{ __('Reuniões') }}
                     </x-nav-link>
+                    <x-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*')">
+                        {{ __('Projetos') }}
+                    </x-nav-link>
+                    @can('manage-structure')
+                        <x-nav-link :href="route('teams.index')" :active="request()->routeIs('teams.*')">
+                            {{ __('Equipes') }}
+                        </x-nav-link>
+                    @endcan
                 </div>
             </div>
 
@@ -81,6 +89,17 @@
             @can('manage-users')
                 <x-responsive-nav-link :href="route('users.index')" :active="request()->routeIs('users.*') || request()->routeIs('participants.*')">
                     {{ __('Participantes') }}
+                </x-responsive-nav-link>
+            @endcan
+            <x-responsive-nav-link :href="route('meetings.index')" :active="request()->routeIs('meetings.*')">
+                {{ __('Reuniões') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*')">
+                {{ __('Projetos') }}
+            </x-responsive-nav-link>
+            @can('manage-structure')
+                <x-responsive-nav-link :href="route('teams.index')" :active="request()->routeIs('teams.*')">
+                    {{ __('Equipes') }}
                 </x-responsive-nav-link>
             @endcan
         </div>

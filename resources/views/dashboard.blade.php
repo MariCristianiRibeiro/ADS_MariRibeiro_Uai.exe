@@ -10,6 +10,66 @@
                 <a href="{{ route('meetings.create') }}" class="dashboard-action">+ Agendar reunião</a>
             </div>
 
+            <section class="calculator-panel mb-6" aria-labelledby="meeting-timer-title">
+                <div class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <p class="panel-overline">Acompanhe em tempo real</p>
+                        <h2 id="meeting-timer-title" class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Cronômetro da reunião</h2>
+                        <p class="mt-2 text-sm leading-6 text-slate-600">Selecione uma reunião criada por você para contabilizar o tempo e o investimento realizado.</p>
+                    </div>
+                    <a href="{{ route('meetings.index') }}" class="dashboard-link">Ver reuniões</a>
+                </div>
+
+                @if ($dashboardMeetings->isNotEmpty())
+                    <div x-data="dashboardMeetingTimer(@js($dashboardMeetings), @js($selectedMeetingId))" class="mt-6">
+                        <label for="dashboard-meeting" class="block text-sm font-medium text-slate-700">Reunião</label>
+                        <select id="dashboard-meeting" x-model.number="selectedMeetingId" x-on:change="selectMeeting()" x-bind:disabled="isRunning || processing" class="mt-2 block w-full rounded-md border-slate-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 disabled:bg-slate-100">
+                            @foreach ($dashboardMeetings as $meeting)
+                                <option value="{{ $meeting['id'] }}">{{ $meeting['title'] }} — {{ $meeting['date'] }}</option>
+                            @endforeach
+                        </select>
+
+                        <div class="mt-6 grid gap-6 rounded-xl bg-slate-950 p-6 text-white shadow-lg sm:grid-cols-[minmax(0,1.2fr)_minmax(14rem,0.8fr)] sm:items-center sm:p-8">
+                            <div>
+                                <div class="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.18em] text-teal-300">
+                                    <span class="relative flex h-3 w-3">
+                                        <span x-show="isRunning" class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span class="relative inline-flex h-3 w-3 rounded-full" x-bind:class="isRunning ? 'bg-emerald-400' : 'bg-slate-500'"></span>
+                                    </span>
+                                    <span x-text="isRunning ? 'Reunião em andamento' : selectedMeeting?.status === 'completed' ? 'Reunião finalizada' : 'Cronômetro'"></span>
+                                </div>
+                                <p class="mt-3 font-mono text-5xl font-bold tabular-nums tracking-tight text-white sm:text-6xl lg:text-7xl" aria-live="off" x-text="formatTime()">00:00:00</p>
+                                <p class="mt-2 text-sm text-slate-400"><span x-text="confirmedAttendeesCount"></span> participante(s) com presença confirmada</p>
+                            </div>
+                            <div class="rounded-lg border border-white/10 bg-white/5 p-5 sm:text-right">
+                                <p class="text-sm font-medium text-slate-300">Investimento acumulado</p>
+                                <p class="mt-2 text-3xl font-bold tabular-nums tracking-tight text-teal-300 sm:text-4xl" x-text="formatCurrency(investedValue)">R$ 0,00</p>
+                                <p class="mt-2 text-xs text-slate-400">Calculado pelo valor-hora das presenças confirmadas.</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-5 flex flex-col gap-4">
+                            <p x-show="isRunning" class="text-sm font-medium text-green-700">O cronômetro continua contando mesmo se você atualizar a página.</p>
+                            <p x-show="selectedMeeting?.status === 'completed'" class="text-sm font-medium text-slate-600">Reunião encerrada. O tempo e o investimento foram salvos para os relatórios.</p>
+                            <p x-show="error" class="text-sm font-medium text-red-700" x-text="error"></p>
+                            <div class="flex flex-col items-stretch gap-3 sm:items-end">
+                                <button type="button" x-show="canStart" x-on:click="start()" x-bind:disabled="processing" class="dashboard-action justify-center disabled:cursor-wait disabled:opacity-60">Iniciar cronômetro</button>
+                                <button type="button" x-show="isRunning" x-on:click="stop()" x-bind:disabled="processing" class="dashboard-action disabled:cursor-wait disabled:opacity-60">Pausar e salvar tempo</button>
+                                <button type="button" x-show="canFinish" x-on:click="finish()" x-bind:disabled="processing" class="inline-flex items-center justify-center rounded-md border border-red-200 bg-white px-5 py-3 text-sm font-bold text-red-700 shadow-sm transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-60">
+                                    <span x-text="processing ? 'Finalizando...' : 'Finalizar reunião e encerrar cálculo'"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                @else
+                    <div class="mt-6 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center">
+                        <p class="font-medium text-slate-800">Você ainda não criou reuniões.</p>
+                        <p class="mt-1 text-sm text-slate-500">Cadastre uma reunião para iniciar o cronômetro e acompanhar o investimento.</p>
+                        <a href="{{ route('meetings.create') }}" class="dashboard-action mt-4">Criar reunião</a>
+                    </div>
+                @endif
+            </section>
+
             <div class="grid gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(20rem,0.75fr)]">
                 <section class="calculator-panel" aria-labelledby="calculator-title">
                     <div class="flex items-start justify-between gap-4">

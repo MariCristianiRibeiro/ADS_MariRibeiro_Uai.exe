@@ -2,13 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
 use App\Models\Directorate;
 use App\Models\JobPosition;
 use App\Models\Team;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -51,7 +53,7 @@ class UserManagementController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
+        $rules = [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:6'],
@@ -62,17 +64,35 @@ class UserManagementController extends Controller
             'job_position_id' => ['nullable', 'integer', 'exists:job_positions,id'],
             'supervisor_ids' => ['nullable', 'array', 'max:2'],
             'supervisor_ids.*' => ['nullable', 'integer', 'exists:users,id'],
-        ]);
+        ];
+
+        if ($request->input('role') !== 'admin') {
+            $rules['email'][] = Rule::unique('participants', 'email');
+        }
+
+        $validated = $request->validate($rules);
 
         $supervisorIds = collect($validated['supervisor_ids'] ?? [])->unique()->values();
         $this->validateSupervisors($validated['role'], $supervisorIds);
 
-        $user = User::create([
-            ...collect($validated)->except('supervisor_ids', 'password')->all(),
-            'password' => Hash::make($validated['password']),
-        ]);
+        DB::transaction(function () use ($validated, $supervisorIds): void {
+            $user = User::create([
+                ...collect($validated)->except('supervisor_ids', 'password')->all(),
+                'password' => Hash::make($validated['password']),
+            ]);
 
-        $this->syncSupervisors($user, $supervisorIds);
+            $this->syncSupervisors($user, $supervisorIds);
+
+            if ($user->role !== 'admin') {
+                $user->participants()->create([
+                    'member_user_id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'status' => $user->status === 'pending_finance' ? 'pending' : $user->status,
+                    'role' => $user->role,
+                ]);
+            }
+        });
 
         return redirect()->route('users.index')->with('success', 'Usuário cadastrado com sucesso.');
     }
@@ -90,7 +110,7 @@ class UserManagementController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email,' . $user->id],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email,'.$user->id],
             'status' => ['required', 'in:active,inactive,pending,pending_finance'],
             'role' => ['required', 'in:admin,hr,executive,director,director_commercial,director_network,manager,participant'],
             'directorate_id' => ['nullable', 'integer', 'exists:directorates,id'],
@@ -98,7 +118,7 @@ class UserManagementController extends Controller
             'job_position_id' => ['nullable', 'integer', 'exists:job_positions,id'],
             'manager_id' => ['nullable', 'integer', 'exists:users,id'],
             'supervisor_ids' => ['nullable', 'array', 'max:2'],
-            'supervisor_ids.*' => ['nullable', 'integer', 'exists:users,id', 'different:' . $user->id],
+            'supervisor_ids.*' => ['nullable', 'integer', 'exists:users,id', 'different:'.$user->id],
             'hourly_rate' => ['nullable', 'numeric', 'min:0'],
         ]);
 

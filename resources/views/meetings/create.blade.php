@@ -20,13 +20,19 @@
                         </div>
 
                         <div>
-                            <label for="project_id" class="block text-sm font-medium text-gray-700">Projeto</label>
+                            <div class="flex items-center justify-between gap-3">
+                                <label for="project_id" class="block text-sm font-medium text-gray-700">Projeto</label>
+                                <a href="{{ route('projects.create', ['return_to' => 'meeting']) }}" class="text-sm font-medium text-indigo-600 hover:text-indigo-800">+ Cadastrar projeto</a>
+                            </div>
                             <select id="project_id" name="project_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
                                 <option value="">Sem projeto</option>
                                 @foreach ($projects as $project)
-                                    <option value="{{ $project->id }}" {{ old('project_id') == $project->id ? 'selected' : '' }}>{{ $project->name }} ({{ $project->code }})</option>
+                                    <option value="{{ $project->id }}" {{ old('project_id', request('project_id')) == $project->id ? 'selected' : '' }}>{{ $project->name }}</option>
                                 @endforeach
                             </select>
+                            @if (session('success'))
+                                <p class="mt-1 text-sm text-green-700">{{ session('success') }}</p>
+                            @endif
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">

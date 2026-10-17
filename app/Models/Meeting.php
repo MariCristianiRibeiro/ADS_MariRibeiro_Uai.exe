@@ -19,6 +19,7 @@ class Meeting extends Model
         'time',
         'duration_minutes',
         'actual_duration_seconds',
+        'timer_started_at',
         'location',
         'status',
         'notes',
@@ -29,6 +30,7 @@ class Meeting extends Model
         'time' => 'string',
         'duration_minutes' => 'integer',
         'actual_duration_seconds' => 'integer',
+        'timer_started_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

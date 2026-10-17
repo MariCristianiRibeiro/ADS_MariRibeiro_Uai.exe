@@ -6,10 +6,12 @@ use App\Models\Meeting;
 use App\Models\Participant;
 use App\Models\Project;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class MeetingController extends Controller
@@ -21,9 +23,9 @@ class MeetingController extends Controller
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                                $q->where('title', 'ilike', "%{$search}%")
-                                    ->orWhere('location', 'ilike', "%{$search}%")
-                                    ->orWhere('notes', 'ilike', "%{$search}%");
+                $q->where('title', 'ilike', "%{$search}%")
+                    ->orWhere('location', 'ilike', "%{$search}%")
+                    ->orWhere('notes', 'ilike', "%{$search}%");
             });
         }
 
@@ -38,11 +40,103 @@ class MeetingController extends Controller
         ]);
     }
 
+    public function startTimer(Meeting $meeting): JsonResponse
+    {
+        abort_unless($meeting->user_id === Auth::id(), 403);
+
+        $meeting = DB::transaction(function () use ($meeting): Meeting {
+            $meeting = Meeting::query()->lockForUpdate()->findOrFail($meeting->id);
+
+            abort_unless($meeting->user_id === Auth::id(), 403);
+            abort_if(
+                in_array($meeting->status, ['completed', 'canceled'], true),
+                422,
+                'Não é possível iniciar o cronômetro de uma reunião encerrada ou cancelada.',
+            );
+
+            if ($meeting->timer_started_at === null) {
+                $meeting->timer_started_at = now();
+                $meeting->status = 'ongoing';
+                $meeting->save();
+            }
+
+            return $meeting;
+        });
+
+        return response()->json([
+            'actualDurationSeconds' => $meeting->actual_duration_seconds ?? 0,
+            'timerStartedAt' => $meeting->timer_started_at?->toIso8601String(),
+        ]);
+    }
+
+    public function stopTimer(Meeting $meeting): JsonResponse
+    {
+        abort_unless($meeting->user_id === Auth::id(), 403);
+
+        $meeting = DB::transaction(function () use ($meeting): Meeting {
+            $meeting = Meeting::query()->lockForUpdate()->findOrFail($meeting->id);
+
+            abort_unless($meeting->user_id === Auth::id(), 403);
+            abort_if($meeting->timer_started_at === null, 409, 'O cronômetro desta reunião não está em andamento.');
+
+            $elapsedSeconds = max(0, now()->timestamp - $meeting->timer_started_at->timestamp);
+            $meeting->actual_duration_seconds = ($meeting->actual_duration_seconds ?? 0) + $elapsedSeconds;
+            $meeting->timer_started_at = null;
+            $meeting->save();
+
+            return $meeting;
+        });
+
+        return response()->json([
+            'actualDurationSeconds' => $meeting->actual_duration_seconds,
+            'timerStartedAt' => null,
+        ]);
+    }
+
+    public function finish(Meeting $meeting): JsonResponse
+    {
+        abort_unless($meeting->user_id === Auth::id(), 403);
+
+        $meeting = DB::transaction(function () use ($meeting): Meeting {
+            $meeting = Meeting::query()->lockForUpdate()->findOrFail($meeting->id);
+
+            abort_unless($meeting->user_id === Auth::id(), 403);
+
+            if ($meeting->status === 'completed' && $meeting->timer_started_at === null) {
+                return $meeting;
+            }
+
+            abort_if($meeting->status === 'canceled', 422, 'Não é possível finalizar uma reunião cancelada.');
+            abort_unless(
+                $meeting->status === 'ongoing' || $meeting->timer_started_at !== null,
+                409,
+                'Inicie a reunião antes de finalizá-la.',
+            );
+
+            if ($meeting->timer_started_at !== null) {
+                $elapsedSeconds = max(0, now()->timestamp - $meeting->timer_started_at->timestamp);
+                $meeting->actual_duration_seconds = ($meeting->actual_duration_seconds ?? 0) + $elapsedSeconds;
+                $meeting->timer_started_at = null;
+            }
+
+            $meeting->status = 'completed';
+            $meeting->save();
+
+            return $meeting;
+        });
+
+        return response()->json([
+            'actualDurationSeconds' => $meeting->actual_duration_seconds ?? 0,
+            'timerStartedAt' => null,
+            'status' => $meeting->status,
+        ]);
+    }
+
     public function create(): View
     {
         return view('meetings.create', [
             'projects' => Project::query()->where('status', 'active')->orderBy('name')->get(),
-            'members' => User::with('jobPosition')->where('status', 'active')->where('role', '<>', 'admin')->orderBy('name')->get(),
+            'members' => User::with(['jobPosition', 'participantProfile'])->where('status', 'active')->where('role', '<>', 'admin')->orderBy('name')->get(),
         ]);
     }
 
@@ -90,7 +184,7 @@ class MeetingController extends Controller
         return view('meetings.edit', [
             'meeting' => $meeting,
             'projects' => Project::query()->where('status', 'active')->orderBy('name')->get(),
-            'members' => User::with('jobPosition')->where('status', 'active')->where('role', '<>', 'admin')->orderBy('name')->get(),
+            'members' => User::with(['jobPosition', 'participantProfile'])->where('status', 'active')->where('role', '<>', 'admin')->orderBy('name')->get(),
         ]);
     }
 

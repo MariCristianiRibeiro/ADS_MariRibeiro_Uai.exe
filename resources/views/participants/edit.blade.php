@@ -28,6 +28,23 @@
                         <div><label for="member_user_id" class="block text-sm font-medium text-gray-700">Usuário interno</label><select id="member_user_id" name="member_user_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"><option value="">Convidado externo, sem acesso</option>@foreach ($members as $member)<option value="{{ $member->id }}" {{ old('member_user_id', $participant->member_user_id) == $member->id ? 'selected' : '' }}>{{ $member->name }} - {{ ['admin' => 'Administrador geral', 'hr' => 'RH', 'executive' => 'Executiva', 'director_commercial' => 'Diretor Comercial', 'director_network' => 'Diretor de Rede', 'manager' => 'Gestor', 'participant' => 'Colaborador'][$member->role] ?? 'Colaborador' }}</option>@endforeach</select><p class="mt-1 text-xs text-gray-500">O perfil e o acesso vêm do usuário. Não é necessário cadastrar o perfil novamente.</p></div>
 
                         <div>
+                            <div class="flex items-center justify-between gap-3">
+                                <label for="team_id" class="block text-sm font-medium text-gray-700">Equipe / rede</label>
+                                @can('manage-structure')
+                                    <a href="{{ route('teams.create') }}" class="text-sm font-medium text-indigo-600 hover:text-indigo-800">+ Cadastrar equipe</a>
+                                @endcan
+                            </div>
+                            <select id="team_id" name="team_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="">Sem equipe</option>
+                                @foreach ($teams as $team)
+                                    <option value="{{ $team->id }}" {{ old('team_id', $participant->memberUser?->team_id) == $team->id ? 'selected' : '' }}>{{ $team->name }} — {{ $team->directorate->name }}</option>
+                                @endforeach
+                            </select>
+                            <p class="mt-1 text-xs text-gray-500">A equipe selecionada também define a rede do participante. Vincule um usuário interno para salvar a seleção.</p>
+                            @error('team_id') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
+                        </div>
+
+                        <div>
                             <label for="phone" class="block text-sm font-medium text-gray-700">Telefone</label>
                             <input id="phone" name="phone" type="text" value="{{ old('phone', $participant->phone) }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                             @error('phone') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
@@ -53,8 +70,9 @@
                         </div>
 
                         <div>
-                            <label for="hourly_rate" class="block text-sm font-medium text-gray-700">Custo por hora (R$)</label>
+                            <label for="hourly_rate" class="block text-sm font-medium text-gray-700">Valor-hora para cálculo das reuniões (R$)</label>
                             <input id="hourly_rate" name="hourly_rate" type="number" step="0.01" min="0" value="{{ old('hourly_rate', $participant->hourly_rate) }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                            <p class="mt-1 text-xs text-gray-500">O valor é multiplicado pelo tempo do cronômetro para calcular o investimento da reunião.</p>
                             @error('hourly_rate') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
                         </div>
 
