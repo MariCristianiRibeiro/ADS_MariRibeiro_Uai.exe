@@ -7,6 +7,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -72,6 +73,26 @@ class User extends Authenticatable
     public function jobPosition()
     {
         return $this->belongsTo(JobPosition::class);
+    }
+
+    public function accessProfiles(): BelongsToMany
+    {
+        return $this->belongsToMany(AccessProfile::class, 'user_profiles')->withTimestamps();
+    }
+
+    public function hasPermission(string $permission): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        if ($this->role === 'hr' && preg_match('/^(users|access_profiles|job_positions|teams)\./', $permission) === 1) {
+            return true;
+        }
+
+        return $this->accessProfiles()->where('access_profiles.active', true)
+            ->whereHas('permissions', fn ($query) => $query->where('permissions.name', $permission))
+            ->exists();
     }
 
     public function manager()

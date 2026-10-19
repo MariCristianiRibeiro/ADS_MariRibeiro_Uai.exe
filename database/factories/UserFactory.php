@@ -2,6 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Models\AccessProfile;
+use App\Models\Permission;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -35,6 +37,29 @@ class UserFactory extends Factory
             'salary' => null,
             'remember_token' => Str::random(10),
         ];
+    }
+
+    public function configure(): static
+    {
+        return $this->afterCreating(function (User $user): void {
+            $permissionNames = [
+                'participants.view', 'participants.create', 'participants.edit', 'participants.delete',
+                'meetings.view', 'meetings.create', 'meetings.edit', 'meetings.delete', 'meetings.finish',
+                'projects.view', 'projects.create', 'reports.view', 'access_profiles.create', 'job_positions.view',
+            ];
+            $permissionIds = collect($permissionNames)->map(function (string $name): int {
+                [$resource, $action] = explode('.', $name, 2);
+                $permission = Permission::firstOrCreate(
+                    ['resource' => $resource, 'action' => $action],
+                    ['name' => $name, 'description' => str($action)->headline().' '.str($resource)->headline()],
+                );
+
+                return $permission->id;
+            });
+            $profile = AccessProfile::firstOrCreate(['name' => 'Pest baseline access'], ['active' => true]);
+            $profile->permissions()->syncWithoutDetaching($permissionIds);
+            $user->accessProfiles()->syncWithoutDetaching([$profile->id]);
+        });
     }
 
     /**

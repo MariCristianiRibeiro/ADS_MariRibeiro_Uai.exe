@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\AccessProfileController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\JobPositionController;
 use App\Http\Controllers\MeetingController;
 use App\Http\Controllers\ParticipantController;
 use App\Http\Controllers\ProfileController;
@@ -21,15 +23,15 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    Route::resource('participants', ParticipantController::class);
-    Route::get('/projects', [ProjectController::class, 'index'])->name('projects.index');
-    Route::get('/projects/create', [ProjectController::class, 'create'])->name('projects.create');
-    Route::post('/projects', [ProjectController::class, 'store'])->name('projects.store');
-    Route::post('/meetings/{meeting}/timer/start', [MeetingController::class, 'startTimer'])->name('meetings.timer.start');
-    Route::post('/meetings/{meeting}/timer/stop', [MeetingController::class, 'stopTimer'])->name('meetings.timer.stop');
-    Route::post('/meetings/{meeting}/finish', [MeetingController::class, 'finish'])->name('meetings.finish');
-    Route::resource('meetings', MeetingController::class);
-    Route::get('/reports/meetings', [ReportController::class, 'meetings'])->name('reports.meetings');
+    Route::resource('participants', ParticipantController::class)->except(['show'])->middleware('permission:participants.view');
+    Route::get('/projects', [ProjectController::class, 'index'])->middleware('permission:projects.view')->name('projects.index');
+    Route::get('/projects/create', [ProjectController::class, 'create'])->middleware('permission:projects.create')->name('projects.create');
+    Route::post('/projects', [ProjectController::class, 'store'])->middleware('permission:projects.create')->name('projects.store');
+    Route::post('/meetings/{meeting}/timer/start', [MeetingController::class, 'startTimer'])->middleware('permission:meetings.view')->name('meetings.timer.start');
+    Route::post('/meetings/{meeting}/timer/stop', [MeetingController::class, 'stopTimer'])->middleware('permission:meetings.view')->name('meetings.timer.stop');
+    Route::post('/meetings/{meeting}/finish', [MeetingController::class, 'finish'])->middleware('permission:meetings.view')->name('meetings.finish');
+    Route::resource('meetings', MeetingController::class)->middleware('permission:meetings.view');
+    Route::get('/reports/meetings', [ReportController::class, 'meetings'])->middleware('permission:reports.view')->name('reports.meetings');
 
     Route::middleware('can:manage-users')->group(function () {
         Route::get('/users', [UserManagementController::class, 'index'])->name('users.index');
@@ -39,10 +41,25 @@ Route::middleware('auth')->group(function () {
         Route::put('/users/{user}', [UserManagementController::class, 'update'])->name('users.update');
     });
 
+    Route::middleware('can:manage-access-profiles')->group(function () {
+        Route::get('/access-profiles', [AccessProfileController::class, 'index'])->middleware('permission:access_profiles.view')->name('access-profiles.index');
+        Route::get('/access-profiles/create', [AccessProfileController::class, 'create'])->middleware('permission:access_profiles.create')->name('access-profiles.create');
+        Route::post('/access-profiles', [AccessProfileController::class, 'store'])->middleware('permission:access_profiles.create')->name('access-profiles.store');
+        Route::get('/access-profiles/{accessProfile}/edit', [AccessProfileController::class, 'edit'])->middleware('permission:access_profiles.edit')->name('access-profiles.edit');
+        Route::put('/access-profiles/{accessProfile}', [AccessProfileController::class, 'update'])->middleware('permission:access_profiles.edit')->name('access-profiles.update');
+        Route::patch('/access-profiles/{accessProfile}/deactivate', [AccessProfileController::class, 'deactivate'])->middleware('permission:access_profiles.administer')->name('access-profiles.deactivate');
+    });
+
     Route::middleware('can:manage-structure')->group(function () {
         Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
         Route::get('/teams/create', [TeamController::class, 'create'])->name('teams.create');
         Route::post('/teams', [TeamController::class, 'store'])->name('teams.store');
+        Route::get('/job-positions', [JobPositionController::class, 'index'])->middleware('permission:job_positions.view')->name('job-positions.index');
+        Route::get('/job-positions/create', [JobPositionController::class, 'create'])->middleware('permission:job_positions.create')->name('job-positions.create');
+        Route::post('/job-positions', [JobPositionController::class, 'store'])->middleware('permission:job_positions.create')->name('job-positions.store');
+        Route::get('/job-positions/{jobPosition}/edit', [JobPositionController::class, 'edit'])->middleware('permission:job_positions.edit')->name('job-positions.edit');
+        Route::put('/job-positions/{jobPosition}', [JobPositionController::class, 'update'])->middleware('permission:job_positions.edit')->name('job-positions.update');
+        Route::patch('/job-positions/{jobPosition}/deactivate', [JobPositionController::class, 'deactivate'])->middleware('permission:job_positions.deactivate')->name('job-positions.deactivate');
     });
 });
 

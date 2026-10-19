@@ -13,6 +13,8 @@ class ProjectController extends Controller
 {
     public function index(): View
     {
+        abort_unless(Auth::user()->hasPermission('projects.view'), 403);
+
         return view('projects.index', [
             'projects' => Project::query()->withCount('meetings')->orderBy('name')->get(),
         ]);
@@ -20,6 +22,8 @@ class ProjectController extends Controller
 
     public function create(Request $request): View
     {
+        abort_unless($request->user()->hasPermission('projects.create'), 403);
+
         return view('projects.create', [
             'returnToMeeting' => $request->query('return_to') === 'meeting',
         ]);
@@ -27,6 +31,8 @@ class ProjectController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        abort_unless($request->user()->hasPermission('projects.create'), 403);
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', 'unique:projects,name'],
             'return_to' => ['nullable', 'in:meeting'],

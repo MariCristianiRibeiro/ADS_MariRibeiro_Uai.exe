@@ -19,17 +19,25 @@
                     <x-nav-link :href="route('users.index')" :active="request()->routeIs('users.*') || request()->routeIs('participants.*')">
                         {{ __('Participantes') }}
                     </x-nav-link>
+                    @elsecan('participants.view')
+                    <x-nav-link :href="route('participants.index')" :active="request()->routeIs('participants.*')">{{ __('Participantes') }}</x-nav-link>
                     @endcan
-                    <x-nav-link :href="route('meetings.index')" :active="request()->routeIs('meetings.*')">
+                    @can('access_profiles.view')<x-nav-link :href="route('access-profiles.index')" :active="request()->routeIs('access-profiles.*')">Perfis de acesso</x-nav-link>@endcan
+                    @can('meetings.view')<x-nav-link :href="route('meetings.index')" :active="request()->routeIs('meetings.*')">
                         {{ __('Reuniões') }}
-                    </x-nav-link>
-                    <x-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*')">
+                    </x-nav-link>@endcan
+                    @can('projects.view')<x-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*')">
                         {{ __('Projetos') }}
-                    </x-nav-link>
+                    </x-nav-link>@endcan
                     @can('manage-structure')
-                        <x-nav-link :href="route('teams.index')" :active="request()->routeIs('teams.*')">
-                            {{ __('Equipes') }}
-                        </x-nav-link>
+                        @can('job_positions.view')
+                        <x-nav-link :href="route('job-positions.index')" :active="request()->routeIs('job-positions.*')">Cargos</x-nav-link>
+                        @endcan
+                        @can('teams.view')
+                            <x-nav-link :href="route('teams.index')" :active="request()->routeIs('teams.*')">
+                                {{ __('Equipes') }}
+                            </x-nav-link>
+                        @endcan
                     @endcan
                 </div>
             </div>
@@ -90,17 +98,27 @@
                 <x-responsive-nav-link :href="route('users.index')" :active="request()->routeIs('users.*') || request()->routeIs('participants.*')">
                     {{ __('Participantes') }}
                 </x-responsive-nav-link>
+            @elsecan('participants.view')
+                <x-responsive-nav-link :href="route('participants.index')" :active="request()->routeIs('participants.*')">{{ __('Participantes') }}</x-responsive-nav-link>
             @endcan
-            <x-responsive-nav-link :href="route('meetings.index')" :active="request()->routeIs('meetings.*')">
+            @can('access_profiles.view')
+                <x-responsive-nav-link :href="route('access-profiles.index')" :active="request()->routeIs('access-profiles.*')">Perfis de acesso</x-responsive-nav-link>
+            @endcan
+            @can('meetings.view')<x-responsive-nav-link :href="route('meetings.index')" :active="request()->routeIs('meetings.*')">
                 {{ __('Reuniões') }}
-            </x-responsive-nav-link>
-            <x-responsive-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*')">
+            </x-responsive-nav-link>@endcan
+            @can('projects.view')<x-responsive-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*')">
                 {{ __('Projetos') }}
-            </x-responsive-nav-link>
+            </x-responsive-nav-link>@endcan
             @can('manage-structure')
-                <x-responsive-nav-link :href="route('teams.index')" :active="request()->routeIs('teams.*')">
-                    {{ __('Equipes') }}
-                </x-responsive-nav-link>
+                @can('job_positions.view')
+                    <x-responsive-nav-link :href="route('job-positions.index')" :active="request()->routeIs('job-positions.*')">Cargos</x-responsive-nav-link>
+                @endcan
+                @can('teams.view')
+                    <x-responsive-nav-link :href="route('teams.index')" :active="request()->routeIs('teams.*')">
+                        {{ __('Equipes') }}
+                    </x-responsive-nav-link>
+                @endcan
             @endcan
         </div>
 

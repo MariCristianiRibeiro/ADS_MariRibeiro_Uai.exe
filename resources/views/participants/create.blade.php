@@ -53,6 +53,12 @@
                             @error('team_id') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
                         </div>
 
+                        <div><label for="job_position_id" class="block text-sm font-medium text-gray-700">Cargo</label><select id="job_position_id" name="job_position_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"><option value="">Não atribuído</option>@foreach ($jobPositions as $jobPosition)<option value="{{ $jobPosition->id }}" @selected(old('job_position_id') == $jobPosition->id)>{{ $jobPosition->name }}</option>@endforeach</select>@error('job_position_id')<span class="text-sm text-red-600">{{ $message }}</span>@enderror</div>
+
+                        @can('manage-users')
+                            <div><label for="profile_ids" class="block text-sm font-medium text-gray-700">Perfis de acesso</label><select id="profile_ids" name="profile_ids[]" multiple class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">@foreach ($accessProfiles as $profile)<option value="{{ $profile->id }}" @selected(in_array($profile->id, old('profile_ids', [])))>{{ $profile->name }}</option>@endforeach</select><p class="mt-1 text-xs text-gray-500">Somente perfis ativos podem ser atribuídos.</p>@error('profile_ids')<span class="text-sm text-red-600">{{ $message }}</span>@enderror</div>
+                        @endcan
+
                         <div>
                             <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
                             <select id="status" name="status" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">

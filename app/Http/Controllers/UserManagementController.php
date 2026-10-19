@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AccessProfile;
 use App\Models\Directorate;
 use App\Models\JobPosition;
 use App\Models\Team;
@@ -10,6 +11,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -23,8 +25,9 @@ class UserManagementController extends Controller
         if ($request->filled('search')) {
             $search = trim($request->search);
             $query->where(function ($query) use ($search) {
-                $query->where('name', 'ilike', "%{$search}%")
-                    ->orWhere('email', 'ilike', "%{$search}%");
+                $term = '%'.mb_strtolower($search).'%';
+                $query->whereRaw('LOWER(name) LIKE ?', [$term])
+                    ->orWhereRaw('LOWER(email) LIKE ?', [$term]);
             });
         }
 
@@ -61,7 +64,9 @@ class UserManagementController extends Controller
             'role' => ['required', 'in:admin,hr,executive,director,director_commercial,director_network,manager,participant'],
             'directorate_id' => ['nullable', 'integer', 'exists:directorates,id'],
             'team_id' => ['nullable', 'integer', 'exists:teams,id'],
-            'job_position_id' => ['nullable', 'integer', 'exists:job_positions,id'],
+            'job_position_id' => ['nullable', 'integer', Rule::exists('job_positions', 'id')->where('active', true)],
+            'profile_ids' => ['nullable', 'array'],
+            'profile_ids.*' => ['integer', 'distinct', Rule::exists('access_profiles', 'id')->where('active', true)],
             'supervisor_ids' => ['nullable', 'array', 'max:2'],
             'supervisor_ids.*' => ['nullable', 'integer', 'exists:users,id'],
         ];
@@ -77,11 +82,15 @@ class UserManagementController extends Controller
 
         DB::transaction(function () use ($validated, $supervisorIds): void {
             $user = User::create([
-                ...collect($validated)->except('supervisor_ids', 'password')->all(),
+                ...collect($validated)->except('supervisor_ids', 'profile_ids', 'password')->all(),
                 'password' => Hash::make($validated['password']),
             ]);
 
             $this->syncSupervisors($user, $supervisorIds);
+            $user->accessProfiles()->sync($validated['profile_ids'] ?? []);
+            if (! empty($validated['profile_ids'])) {
+                Log::notice('Access profiles assigned to user', ['actor_id' => auth()->id(), 'user_id' => $user->id, 'profile_ids' => $validated['profile_ids']]);
+            }
 
             if ($user->role !== 'admin') {
                 $user->participants()->create([
@@ -102,6 +111,7 @@ class UserManagementController extends Controller
         return view('users.edit', [
             'user' => $user,
             'supervisors' => $user->supervisors,
+            'selectedProfileIds' => $user->accessProfiles->modelKeys(),
             ...$this->structureOptions($user->id),
         ]);
     }
@@ -115,7 +125,14 @@ class UserManagementController extends Controller
             'role' => ['required', 'in:admin,hr,executive,director,director_commercial,director_network,manager,participant'],
             'directorate_id' => ['nullable', 'integer', 'exists:directorates,id'],
             'team_id' => ['nullable', 'integer', 'exists:teams,id'],
-            'job_position_id' => ['nullable', 'integer', 'exists:job_positions,id'],
+            'job_position_id' => ['nullable', 'integer', Rule::exists('job_positions', 'id')->where(function ($query) use ($user) {
+                $query->where('active', true)->orWhere('id', $user->job_position_id);
+            })],
+            'profile_ids' => ['nullable', 'array'],
+            'clear_profiles' => ['sometimes', 'boolean'],
+            'profile_ids.*' => ['integer', 'distinct', Rule::exists('access_profiles', 'id')->where(function ($query) use ($user) {
+                $query->where('active', true)->orWhereIn('id', $user->accessProfiles()->select('access_profiles.id'));
+            })],
             'manager_id' => ['nullable', 'integer', 'exists:users,id'],
             'supervisor_ids' => ['nullable', 'array', 'max:2'],
             'supervisor_ids.*' => ['nullable', 'integer', 'exists:users,id', 'different:'.$user->id],
@@ -123,9 +140,24 @@ class UserManagementController extends Controller
         ]);
 
         $supervisorIds = collect($validated['supervisor_ids'] ?? [])->unique()->values();
+        if ($user->is(auth()->user()) && ($validated['role'] !== $user->role || array_key_exists('job_position_id', $validated) || array_key_exists('profile_ids', $validated) || ! empty($validated['clear_profiles']))) {
+            throw ValidationException::withMessages(['profile_ids' => 'Você não pode alterar seus próprios acessos ou cargo.']);
+        }
+        if ($user->role === 'admin' && $validated['role'] !== 'admin' && User::where('role', 'admin')->count() <= 1) {
+            throw ValidationException::withMessages(['role' => 'O último administrador não pode perder o acesso administrativo.']);
+        }
         $this->validateSupervisors($validated['role'], $supervisorIds, $user->id);
-        $user->update(collect($validated)->except('supervisor_ids')->all());
-        $this->syncSupervisors($user, $supervisorIds);
+        DB::transaction(function () use ($validated, $user, $supervisorIds): void {
+            $user->update(collect($validated)->except('supervisor_ids', 'profile_ids', 'clear_profiles')->all());
+            $this->syncSupervisors($user, $supervisorIds);
+            if (! empty($validated['clear_profiles'])) {
+                $user->accessProfiles()->detach();
+                Log::notice('Access profiles removed from user', ['actor_id' => auth()->id(), 'user_id' => $user->id]);
+            } elseif (! empty($validated['profile_ids'])) {
+                $user->accessProfiles()->sync($validated['profile_ids'] ?? []);
+                Log::notice('Access profiles updated for user', ['actor_id' => auth()->id(), 'user_id' => $user->id, 'profile_ids' => $validated['profile_ids']]);
+            }
+        });
 
         return redirect()->route('users.index')->with('success', 'Usuário atualizado com sucesso.');
     }
@@ -140,7 +172,10 @@ class UserManagementController extends Controller
                 ->get(),
             'directorates' => Directorate::where('active', true)->orderBy('name')->get(),
             'teams' => Team::where('active', true)->orderBy('name')->get(),
-            'jobPositions' => JobPosition::where('active', true)->orderBy('name')->get(),
+            'jobPositions' => JobPosition::where('active', true)->orWhere('id', User::find($exceptUserId)?->job_position_id)->orderBy('name')->get(),
+            'accessProfiles' => AccessProfile::where('active', true)
+                ->when($exceptUserId, fn ($query) => $query->orWhereIn('id', User::find($exceptUserId)?->accessProfiles()->select('access_profiles.id') ?? []))
+                ->orderBy('name')->get(),
         ];
     }
 

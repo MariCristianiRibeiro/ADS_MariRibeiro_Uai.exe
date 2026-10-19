@@ -15,6 +15,8 @@ class TeamController extends Controller
 {
     public function index(): View
     {
+        abort_unless(auth()->user()->hasPermission('teams.view'), 403);
+
         return view('teams.index', [
             'teams' => Team::query()
                 ->with('directorate')
@@ -27,6 +29,8 @@ class TeamController extends Controller
 
     public function create(): View
     {
+        abort_unless(auth()->user()->hasPermission('teams.create'), 403);
+
         return view('teams.create', [
             'networkNames' => Directorate::query()
                 ->where('active', true)
@@ -37,6 +41,8 @@ class TeamController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        abort_unless($request->user()->hasPermission('teams.create'), 403);
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'network' => ['required', 'string', 'max:255'],

@@ -18,6 +18,8 @@ class MeetingController extends Controller
 {
     public function index(Request $request): View
     {
+        abort_unless($request->user()->hasPermission('meetings.view'), 403);
+
         $query = Meeting::where('user_id', Auth::id())->latest();
 
         if ($request->filled('search')) {
@@ -42,6 +44,7 @@ class MeetingController extends Controller
 
     public function startTimer(Meeting $meeting): JsonResponse
     {
+        abort_unless(Auth::user()->hasPermission('meetings.edit'), 403);
         abort_unless($meeting->user_id === Auth::id(), 403);
 
         $meeting = DB::transaction(function () use ($meeting): Meeting {
@@ -71,6 +74,7 @@ class MeetingController extends Controller
 
     public function stopTimer(Meeting $meeting): JsonResponse
     {
+        abort_unless(Auth::user()->hasPermission('meetings.edit'), 403);
         abort_unless($meeting->user_id === Auth::id(), 403);
 
         $meeting = DB::transaction(function () use ($meeting): Meeting {
@@ -95,6 +99,7 @@ class MeetingController extends Controller
 
     public function finish(Meeting $meeting): JsonResponse
     {
+        abort_unless(Auth::user()->hasPermission('meetings.finish'), 403);
         abort_unless($meeting->user_id === Auth::id(), 403);
 
         $meeting = DB::transaction(function () use ($meeting): Meeting {
@@ -134,6 +139,8 @@ class MeetingController extends Controller
 
     public function create(): View
     {
+        abort_unless(Auth::user()->hasPermission('meetings.create'), 403);
+
         return view('meetings.create', [
             'projects' => Project::query()->where('status', 'active')->orderBy('name')->get(),
             'members' => User::with(['jobPosition', 'participantProfile'])->where('status', 'active')->where('role', '<>', 'admin')->orderBy('name')->get(),
@@ -142,6 +149,8 @@ class MeetingController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        abort_unless($request->user()->hasPermission('meetings.create'), 403);
+
         $request->merge(['duration_minutes' => $request->input('duration_minutes', 60)]);
 
         $validated = $request->validate([
@@ -177,6 +186,8 @@ class MeetingController extends Controller
 
     public function edit(Meeting $meeting): View
     {
+        abort_unless(Auth::user()->hasPermission('meetings.edit'), 403);
+
         abort_unless($meeting->user_id === Auth::id(), 403);
 
         $meeting->load('users');
@@ -190,6 +201,8 @@ class MeetingController extends Controller
 
     public function update(Request $request, Meeting $meeting): RedirectResponse
     {
+        abort_unless($request->user()->hasPermission('meetings.edit'), 403);
+
         abort_unless($meeting->user_id === Auth::id(), 403);
 
         $request->merge(['duration_minutes' => $request->input('duration_minutes', $meeting->duration_minutes ?: 60)]);
@@ -226,6 +239,8 @@ class MeetingController extends Controller
 
     public function destroy(Meeting $meeting): RedirectResponse
     {
+        abort_unless(Auth::user()->hasPermission('meetings.delete'), 403);
+
         abort_unless($meeting->user_id === Auth::id(), 403);
 
         $meeting->delete();
