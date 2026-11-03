@@ -75,7 +75,6 @@ class ParticipantController extends Controller
             'type' => ['required', 'in:internal,external,guest'],
             'team_id' => ['nullable', 'integer', Rule::exists('teams', 'id')->where('active', true)],
             'job_position_id' => ['nullable', 'integer', Rule::exists('job_positions', 'id')->where('active', true)],
-            'hourly_rate' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
         ];
         if ($request->user()->can('manage-users')) {
@@ -95,7 +94,6 @@ class ParticipantController extends Controller
                 'password' => Hash::make($validated['password']),
                 'role' => 'participant',
                 'status' => $validated['status'],
-                'hourly_rate' => $validated['hourly_rate'] ?? null,
                 'team_id' => $team?->id,
                 'directorate_id' => $team?->directorate_id,
                 'job_position_id' => $validated['job_position_id'] ?? null,
@@ -151,7 +149,6 @@ class ParticipantController extends Controller
             'phone' => ['nullable', 'string', 'max:30'],
             'status' => ['required', 'in:active,inactive,pending'],
             'type' => ['required', 'in:internal,external,guest'],
-            'hourly_rate' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
         ];
         if ($request->user()->can('manage-users')) {
@@ -182,7 +179,6 @@ class ParticipantController extends Controller
             if ($memberUserId !== null) {
                 $memberUser = User::whereKey($memberUserId)->firstOrFail();
                 $memberUser->update([
-                    'hourly_rate' => $validated['hourly_rate'] ?? null,
                     'team_id' => $team?->id,
                     'directorate_id' => $team?->directorate_id,
                     'job_position_id' => $validated['job_position_id'] ?? null,

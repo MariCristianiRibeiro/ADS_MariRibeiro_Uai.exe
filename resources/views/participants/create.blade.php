@@ -77,14 +77,6 @@
                                 <option value="guest" selected>Convidado</option>
                             </select>
                         </div>
-
-                        <div>
-                            <label for="hourly_rate" class="block text-sm font-medium text-gray-700">Valor-hora para cálculo das reuniões (R$)</label>
-                            <input id="hourly_rate" name="hourly_rate" type="number" step="0.01" min="0" value="{{ old('hourly_rate') }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                            <p class="mt-1 text-xs text-gray-500">O valor é multiplicado pelo tempo do cronômetro para calcular o investimento da reunião.</p>
-                            @error('hourly_rate') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
-                        </div>
-
                         <div>
                             <label for="notes" class="block text-sm font-medium text-gray-700">Observações</label>
                             <textarea id="notes" name="notes" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">{{ old('notes') }}</textarea>

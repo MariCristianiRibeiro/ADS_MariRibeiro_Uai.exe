@@ -1,4 +1,4 @@
-<x-app-layout>
+﻿<x-app-layout>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
             Nova reunião
@@ -66,18 +66,7 @@
                             </select>
                             @error('status') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
                         </div>
-
-                        <div>
-                            <label for="participants" class="block text-sm font-medium text-gray-700">Usuários participantes</label>
-                            <select id="participants" name="participants[]" multiple x-on:change="$dispatch('meeting-participants-changed', { ids: Array.from($event.target.selectedOptions, option => Number(option.value)) })" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                @foreach ($members as $member)
-                                    <option value="{{ $member->id }}" {{ in_array($member->id, $selectedMemberIds, true) ? 'selected' : '' }}>
-                                        {{ $member->name }} - {{ ['executive' => 'Executiva', 'director_commercial' => 'Diretor Comercial', 'director_network' => 'Diretor de Rede', 'manager' => 'Gestor', 'participant' => 'Colaborador'][$member->role] ?? $member->role }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            <p class="mt-1 text-xs text-gray-500">Selecione usuários cadastrados. Administrador geral não participa de agendas.</p>
-                        </div>
+                        @include('meetings._participant-picker', ['selectedMemberIds' => $selectedMemberIds])
 
                         <div>
                             <label for="notes" class="block text-sm font-medium text-gray-700">Observações</label>

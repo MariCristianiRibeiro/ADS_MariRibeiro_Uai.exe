@@ -70,11 +70,6 @@
                             @error('status') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
                         </div>
 
-                        <div>
-                            <label for="hourly_rate" class="block text-sm font-medium text-gray-700">Custo por hora (R$)</label>
-                            <input id="hourly_rate" name="hourly_rate" type="number" step="0.01" min="0" value="{{ old('hourly_rate', $user->hourly_rate ?? '') }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                            @error('hourly_rate') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
-                        </div>
                     </div>
 
                     <div class="mt-6 flex justify-end gap-3">

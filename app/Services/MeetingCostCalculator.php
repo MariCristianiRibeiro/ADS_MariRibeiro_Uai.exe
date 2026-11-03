@@ -10,10 +10,7 @@ class MeetingCostCalculator
 {
     public function participantRate(Participant $participant): float
     {
-        return (float) ($participant->memberUser?->jobPosition?->hourly_rate
-            ?? $participant->memberUser?->hourly_rate
-            ?? $participant->hourly_rate
-            ?? 0);
+        return (float) ($participant->memberUser?->jobPosition?->hourly_rate ?? 0);
     }
 
     public function participantCost(Meeting $meeting, Participant $participant): float
@@ -23,10 +20,7 @@ class MeetingCostCalculator
 
     public function userRate(User $user): float
     {
-        return (float) ($user->jobPosition?->hourly_rate
-            ?? $user->hourly_rate
-            ?? $user->participantProfile?->hourly_rate
-            ?? 0);
+        return (float) ($user->jobPosition?->hourly_rate ?? 0);
     }
 
     public function userCost(Meeting $meeting, User $user): float
