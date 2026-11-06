@@ -16,11 +16,11 @@ class PermissionSeeder extends Seeder
             'participants' => ['view' => 'Visualizar participantes', 'create' => 'Cadastrar participantes', 'edit' => 'Editar participantes', 'delete' => 'Excluir participantes'],
             'meetings' => ['view' => 'Visualizar reuniões', 'create' => 'Cadastrar reuniões', 'edit' => 'Editar reuniões', 'delete' => 'Excluir reuniões', 'finish' => 'Finalizar reuniões'],
             'projects' => ['view' => 'Visualizar projetos', 'create' => 'Cadastrar projetos'],
-            'reports' => ['view' => 'Visualizar relatórios', 'export' => 'Exportar relatórios'],
+            'reports' => ['view' => 'Visualizar relatórios', 'export' => 'Exportar relatórios', 'costs' => 'Visualizar custos reais'],
             'users' => ['administer' => 'Administrar usuários'],
             'job_positions' => ['view' => 'Visualizar cargos', 'create' => 'Cadastrar cargos', 'edit' => 'Editar cargos', 'deactivate' => 'Inativar cargos'],
             'access_profiles' => ['view' => 'Visualizar perfis', 'create' => 'Cadastrar perfis', 'edit' => 'Editar perfis', 'administer' => 'Administrar permissões'],
-            'teams' => ['view' => 'Visualizar equipes', 'create' => 'Cadastrar equipes'],
+            'teams' => ['view' => 'Visualizar equipes', 'create' => 'Cadastrar equipes', 'manage' => 'Administrar equipes'],
         ];
 
         foreach ($permissions as $resource => $actions) {

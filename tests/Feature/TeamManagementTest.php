@@ -8,7 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 it('creates a team under a network and generates its internal code', function () {
-    $hr = User::factory()->create(['role' => 'hr']);
+    $hr = createUserWithPermissions(['teams.view', 'teams.create'], ['role' => 'hr']);
 
     $this->actingAs($hr)
         ->get(route('teams.create'))
@@ -44,7 +44,7 @@ it('reuses a network and gives teams unique generated codes within it', function
         'name' => 'Rede Norte',
         'code' => 'REDE-NORTE',
     ]);
-    $hr = User::factory()->create(['role' => 'hr']);
+    $hr = createUserWithPermissions(['teams.view', 'teams.create'], ['role' => 'hr']);
 
     $this->actingAs($hr)->post(route('teams.store'), [
         'name' => 'Operações',
@@ -77,7 +77,7 @@ it('forbids participants from managing teams', function () {
 });
 
 it('requires both a team name and network', function () {
-    $this->actingAs(User::factory()->create(['role' => 'admin']))
+    $this->actingAs(createAdminUser())
         ->from(route('teams.create'))
         ->post(route('teams.store'), [
             'name' => '',

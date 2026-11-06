@@ -9,7 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 it('user can view participant management page', function () {
-    $user = User::factory()->create();
+    $user = createUserWithPermissions(['participants.view']);
 
     $this->actingAs($user)
         ->get('/participants')
@@ -17,7 +17,7 @@ it('user can view participant management page', function () {
 });
 
 it('user can create a participant', function () {
-    $user = User::factory()->create();
+    $user = createUserWithPermissions(['participants.view', 'participants.create']);
 
     $this->actingAs($user)
         ->post('/participants', [
@@ -57,7 +57,7 @@ it('user can create a participant', function () {
 });
 
 it('assigns the selected team and its network to a newly registered participant', function () {
-    $owner = User::factory()->create();
+    $owner = createUserWithPermissions(['participants.view', 'participants.create']);
     $directorate = Directorate::create(['name' => 'Rede Leste', 'code' => 'REDE-LESTE']);
     $team = Team::create([
         'directorate_id' => $directorate->id,
@@ -91,7 +91,7 @@ it('assigns the selected team and its network to a newly registered participant'
 });
 
 it('updates the linked participant account team and network', function () {
-    $owner = User::factory()->create();
+    $owner = createUserWithPermissions(['participants.view', 'participants.edit']);
     $member = User::factory()->create(['role' => 'participant']);
     $oldNetwork = Directorate::create(['name' => 'Rede Antiga', 'code' => 'REDE-ANTIGA']);
     $oldTeam = Team::create([
@@ -141,7 +141,7 @@ it('updates the linked participant account team and network', function () {
 });
 
 it('rejects inactive teams when assigning a participant', function () {
-    $owner = User::factory()->create();
+    $owner = createUserWithPermissions(['participants.view', 'participants.create']);
     $directorate = Directorate::create(['name' => 'Rede Inativa', 'code' => 'REDE-INATIVA']);
     $team = Team::create([
         'directorate_id' => $directorate->id,
@@ -165,7 +165,7 @@ it('rejects inactive teams when assigning a participant', function () {
 });
 
 it('only shows the authenticated user participants and searches by name', function () {
-    $owner = User::factory()->create(['name' => 'Ana Souza']);
+    $owner = createUserWithPermissions(['participants.view'], ['name' => 'Ana Souza']);
     $other = User::factory()->create(['name' => 'Carlos Lima']);
 
     Participant::create([
@@ -192,7 +192,7 @@ it('only shows the authenticated user participants and searches by name', functi
 });
 
 it('shows the participant supervisors in the management table', function () {
-    $owner = User::factory()->create(['name' => 'Maria Colaboradora', 'role' => 'participant']);
+    $owner = createUserWithPermissions(['participants.view'], ['name' => 'Maria Colaboradora', 'role' => 'participant']);
     $manager = User::factory()->create(['name' => 'Carlos Gerente', 'role' => 'manager']);
     $owner->supervisors()->attach($manager->id, ['relationship_type' => 'manager_collaborator']);
 

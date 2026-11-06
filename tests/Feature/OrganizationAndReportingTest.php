@@ -12,7 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 it('calculates real project cost for a manager without exposing individual rates', function () {
-    $manager = User::factory()->create(['role' => 'manager']);
+    $manager = createUserWithPermissions(['reports.view', 'reports.costs'], ['role' => 'manager']);
     $member = User::factory()->create(['role' => 'participant', 'salary' => 44000]);
     $directorate = Directorate::create(['name' => 'Operações', 'code' => 'OPS']);
     $team = Team::create(['directorate_id' => $directorate->id, 'manager_id' => $manager->id, 'name' => 'Produto', 'code' => 'PROD']);
@@ -37,7 +37,7 @@ it('calculates real project cost for a manager without exposing individual rates
 });
 
 it('does not expose real cost to a collaborator', function () {
-    $user = User::factory()->create(['role' => 'participant']);
+    $user = createUserWithPermissions(['reports.view'], ['role' => 'participant']);
 
     $this->actingAs($user)->getJson('/reports/meetings')
         ->assertOk()
@@ -45,9 +45,18 @@ it('does not expose real cost to a collaborator', function () {
         ->assertJsonMissingPath('real_cost');
 });
 
+it('does not grant real cost visibility to a manager without the permission', function () {
+    $manager = createUserWithPermissions(['reports.view'], ['role' => 'manager']);
+
+    $this->actingAs($manager)->getJson('/reports/meetings')
+        ->assertOk()
+        ->assertJsonPath('visibility', 'hours')
+        ->assertJsonMissingPath('real_cost');
+});
+
 it('reports planned hours separately from confirmed actual attendance hours to collaborators', function () {
     $owner = User::factory()->create(['role' => 'manager']);
-    $member = User::factory()->create(['role' => 'participant']);
+    $member = createUserWithPermissions(['reports.view'], ['role' => 'participant']);
     $meeting = Meeting::create([
         'user_id' => $owner->id,
         'title' => 'Acompanhamento',
@@ -67,12 +76,12 @@ it('reports planned hours separately from confirmed actual attendance hours to c
         ->assertJsonMissingPath('real_cost');
 });
 
-it('allows only admin and hr to manage the people directory', function () {
-    $this->actingAs(User::factory()->create(['role' => 'admin']))
+it('allows only users with the management permission to manage the people directory', function () {
+    $this->actingAs(createAdminUser())
         ->get('/users')
         ->assertOk();
 
-    $this->actingAs(User::factory()->create(['role' => 'hr']))
+    $this->actingAs(createUserWithPermissions(['users.administer'], ['role' => 'hr']))
         ->get('/users')
         ->assertOk();
 
@@ -82,7 +91,7 @@ it('allows only admin and hr to manage the people directory', function () {
 });
 
 it('shows up to two supervisors beside the profile in the people directory', function () {
-    $admin = User::factory()->create(['role' => 'admin']);
+    $admin = createAdminUser();
     $manager = User::factory()->create(['name' => 'Carlos Gerente', 'role' => 'manager']);
     $director = User::factory()->create(['name' => 'Ana Diretora', 'role' => 'director_network']);
     $participant = User::factory()->create(['role' => 'participant']);
@@ -94,13 +103,13 @@ it('shows up to two supervisors beside the profile in the people directory', fun
     $this->actingAs($admin)
         ->get('/users')
         ->assertOk()
-        ->assertSeeInOrder(['Perfil', 'Superior responsável 1', 'Superior responsável 2'])
+        ->assertSeeInOrder(['Perfil organizacional', 'Superior responsável 1', 'Superior responsável 2'])
         ->assertSee('Carlos Gerente')
         ->assertSee('Ana Diretora');
 });
 
 it('creates a participant profile for every managed user except admins', function () {
-    $admin = User::factory()->create(['role' => 'admin']);
+    $admin = createAdminUser();
 
     $this->actingAs($admin)->post('/users', [
         'name' => 'Maria RH',
@@ -130,7 +139,7 @@ it('creates a participant profile for every managed user except admins', functio
 });
 
 it('supports optional and multiple hierarchical supervisors', function () {
-    $admin = User::factory()->create(['role' => 'admin']);
+    $admin = createAdminUser();
     $directorA = User::factory()->create(['role' => 'director_network']);
     $directorB = User::factory()->create(['role' => 'director_network']);
     $manager = User::factory()->create(['role' => 'manager']);
@@ -157,7 +166,7 @@ it('supports optional and multiple hierarchical supervisors', function () {
 });
 
 it('allows a director to report to an executive and another director', function () {
-    $admin = User::factory()->create(['role' => 'admin']);
+    $admin = createAdminUser();
     $executive = User::factory()->create(['role' => 'executive']);
     $seniorDirector = User::factory()->create(['role' => 'director']);
     $director = User::factory()->create(['role' => 'director']);
@@ -178,7 +187,7 @@ it('allows a director to report to an executive and another director', function 
 });
 
 it('creates a director with an executive and a senior director', function () {
-    $admin = User::factory()->create(['role' => 'admin']);
+    $admin = createAdminUser();
     $executive = User::factory()->create(['role' => 'executive']);
     $seniorDirector = User::factory()->create(['role' => 'director']);
 
@@ -197,7 +206,7 @@ it('creates a director with an executive and a senior director', function () {
 });
 
 it('creates an executive without a supervisor', function () {
-    $admin = User::factory()->create(['role' => 'admin']);
+    $admin = createAdminUser();
 
     $this->actingAs($admin)->post('/users', [
         'name' => 'Executiva Financeira',
@@ -213,7 +222,7 @@ it('creates an executive without a supervisor', function () {
 });
 
 it('shows active registered users as dynamic supervisor options', function () {
-    $admin = User::factory()->create(['role' => 'admin']);
+    $admin = createAdminUser();
     User::factory()->create(['name' => 'Marcus', 'role' => 'executive', 'status' => 'active']);
 
     $this->actingAs($admin)->get('/users/create')

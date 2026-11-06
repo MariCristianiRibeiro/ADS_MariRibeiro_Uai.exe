@@ -13,23 +13,36 @@ class DashboardController extends Controller
 {
     public function index(MeetingCostCalculator $costCalculator): View
     {
+        $canViewCosts = Auth::user()->canViewCosts();
         $meetings = Meeting::query()
             ->where('user_id', Auth::id())
             ->with(['users.jobPosition', 'users.participantProfile', 'participants.memberUser.jobPosition'])
             ->latest()
             ->get()
-            ->map(function (Meeting $meeting) use ($costCalculator): array {
+            ->map(function (Meeting $meeting) use ($costCalculator, $canViewCosts): array {
                 $attendees = $meeting->users->isNotEmpty()
-                    ? $meeting->users->map(fn (User $user): array => [
-                        'name' => $user->name,
-                        'hourlyRate' => $costCalculator->userRate($user),
-                        'attendanceStatus' => $user->pivot->attendance_status,
-                    ])->all()
-                    : $meeting->participants->map(fn (Participant $participant): array => [
-                        'name' => $participant->name,
-                        'hourlyRate' => $costCalculator->participantRate($participant),
-                        'attendanceStatus' => $participant->pivot->attendance_status,
-                    ])->all();
+                    ? $meeting->users->map(function (User $user) use ($costCalculator, $canViewCosts): array {
+                        $attendee = [
+                            'name' => $user->name,
+                            'attendanceStatus' => $user->pivot->attendance_status,
+                        ];
+                        if ($canViewCosts) {
+                            $attendee['hourlyRate'] = $costCalculator->userRate($user);
+                        }
+
+                        return $attendee;
+                    })->all()
+                    : $meeting->participants->map(function (Participant $participant) use ($costCalculator, $canViewCosts): array {
+                        $attendee = [
+                            'name' => $participant->name,
+                            'attendanceStatus' => $participant->pivot->attendance_status,
+                        ];
+                        if ($canViewCosts) {
+                            $attendee['hourlyRate'] = $costCalculator->participantRate($participant);
+                        }
+
+                        return $attendee;
+                    })->all();
 
                 return [
                     'id' => $meeting->id,
@@ -55,6 +68,7 @@ class DashboardController extends Controller
             'activeParticipantsCount' => Participant::where('status', 'active')->count(),
             'dashboardMeetings' => $meetings,
             'selectedMeetingId' => $selectedMeetingId,
+            'canViewCosts' => $canViewCosts,
         ]);
     }
 }

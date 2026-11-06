@@ -41,11 +41,13 @@
                                 <p class="mt-3 font-mono text-5xl font-bold tabular-nums tracking-tight text-white sm:text-6xl lg:text-7xl" aria-live="off" x-text="formatTime()">00:00:00</p>
                                 <p class="mt-2 text-sm text-slate-400"><span x-text="confirmedAttendeesCount"></span> participante(s) com presença confirmada</p>
                             </div>
-                            <div class="rounded-lg border border-white/10 bg-white/5 p-5 sm:text-right">
-                                <p class="text-sm font-medium text-slate-300">Investimento acumulado</p>
-                                <p class="mt-2 text-3xl font-bold tabular-nums tracking-tight text-teal-300 sm:text-4xl" x-text="formatCurrency(investedValue)">R$ 0,00</p>
-                                <p class="mt-2 text-xs text-slate-400">Calculado pelo valor-hora das presenças confirmadas.</p>
-                            </div>
+                            @if ($canViewCosts)
+                                <div class="rounded-lg border border-white/10 bg-white/5 p-5 sm:text-right">
+                                    <p class="text-sm font-medium text-slate-300">Investimento acumulado</p>
+                                    <p class="mt-2 text-3xl font-bold tabular-nums tracking-tight text-teal-300 sm:text-4xl" x-text="formatCurrency(investedValue)">R$ 0,00</p>
+                                    <p class="mt-2 text-xs text-slate-400">Calculado pelo valor-hora das presenças confirmadas.</p>
+                                </div>
+                            @endif
                         </div>
 
                         <div class="mt-5 flex flex-col gap-4">

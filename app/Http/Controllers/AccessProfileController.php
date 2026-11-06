@@ -4,12 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\AccessProfile;
 use App\Models\Permission;
+use App\Services\AccessControlService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class AccessProfileController extends Controller
@@ -29,14 +29,16 @@ class AccessProfileController extends Controller
         return view('access-profiles.form', ['profile' => new AccessProfile, 'permissions' => Permission::orderBy('resource')->orderBy('action')->get()]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, AccessControlService $accessControl): RedirectResponse
     {
         abort_unless($request->user()->hasPermission('access_profiles.create'), 403);
         $validated = $request->validate(['name' => ['required', 'string', 'max:255', 'unique:access_profiles,name'], 'description' => ['nullable', 'string'], 'active' => ['sometimes', 'boolean'], 'permissions' => ['array'], 'permissions.*' => ['integer', 'distinct', 'exists:permissions,id']]);
-        $this->ensureCanGrantPermissions($request, $validated['permissions'] ?? []);
-        DB::transaction(function () use ($validated): void {
+        DB::transaction(function () use ($validated, $request, $accessControl): void {
             $profile = AccessProfile::create([...collect($validated)->except('permissions')->all(), 'active' => $validated['active'] ?? true]);
-            $profile->permissions()->sync($validated['permissions'] ?? []);
+            $accessControl->syncProfilePermissions($request->user(), $profile, $validated['permissions'] ?? []);
+            $accessControl->record($request->user(), 'profile_created', null, $profile, null, [
+                'profile_name' => $profile->name,
+            ]);
         });
         Log::info('Access profile created', ['actor_id' => $request->user()->id, 'profile_name' => $validated['name'], 'permission_count' => count($validated['permissions'] ?? [])]);
 
@@ -50,47 +52,37 @@ class AccessProfileController extends Controller
         return view('access-profiles.form', ['profile' => $accessProfile->load('permissions'), 'permissions' => Permission::orderBy('resource')->orderBy('action')->get()]);
     }
 
-    public function update(Request $request, AccessProfile $accessProfile): RedirectResponse
+    public function update(Request $request, AccessProfile $accessProfile, AccessControlService $accessControl): RedirectResponse
     {
         abort_unless($request->user()->hasPermission('access_profiles.edit'), 403);
         $validated = $request->validate(['name' => ['required', 'string', 'max:255', Rule::unique('access_profiles', 'name')->ignore($accessProfile->id)], 'description' => ['nullable', 'string'], 'active' => ['sometimes', 'boolean'], 'permissions' => ['array'], 'permissions.*' => ['integer', 'distinct', 'exists:permissions,id']]);
-        $this->ensureCanGrantPermissions($request, $validated['permissions'] ?? []);
-        DB::transaction(function () use ($validated, $accessProfile): void {
+        $previousName = $accessProfile->name;
+        DB::transaction(function () use ($validated, $accessProfile, $request, $accessControl, $previousName): void {
             $accessProfile->update([...collect($validated)->except('permissions')->all(), 'active' => $validated['active'] ?? false]);
-            $accessProfile->permissions()->sync($validated['permissions'] ?? []);
+            $accessControl->syncProfilePermissions($request->user(), $accessProfile, $validated['permissions'] ?? []);
+            $accessControl->record($request->user(), 'profile_updated', null, $accessProfile, null, [
+                'previous_name' => $previousName,
+                'profile_name' => $accessProfile->name,
+                'active' => $accessProfile->active,
+            ]);
         });
         Log::info('Access profile updated', ['actor_id' => $request->user()->id, 'profile_id' => $accessProfile->id, 'permission_count' => count($validated['permissions'] ?? [])]);
 
         return redirect()->route('access-profiles.index')->with('success', 'Perfil atualizado com sucesso.');
     }
 
-    public function deactivate(Request $request, AccessProfile $accessProfile): RedirectResponse
+    public function deactivate(Request $request, AccessProfile $accessProfile, AccessControlService $accessControl): RedirectResponse
     {
         abort_unless(auth()->user()->hasPermission('access_profiles.administer'), 403);
 
-        $accessProfile->update(['active' => false]);
+        DB::transaction(function () use ($accessProfile, $accessControl, $request): void {
+            $accessProfile->update(['active' => false]);
+            $accessControl->record($request->user(), 'profile_deactivated', null, $accessProfile, null, [
+                'profile_name' => $accessProfile->name,
+            ]);
+        });
         Log::notice('Access profile deactivated', ['actor_id' => $request->user()->id, 'profile_id' => $accessProfile->id]);
 
         return redirect()->route('access-profiles.index')->with('success', 'Perfil inativado com sucesso.');
-    }
-
-    /**
-     * @param  array<int, int|string>  $permissionIds
-     */
-    private function ensureCanGrantPermissions(Request $request, array $permissionIds): void
-    {
-        $user = $request->user();
-
-        if ($user->isAdmin() || $user->role === 'hr') {
-            return;
-        }
-
-        $authorizedPermissionIds = Permission::query()->whereIn('id', $permissionIds)->get()
-            ->filter(fn (Permission $permission) => $user->hasPermission($permission->name))
-            ->modelKeys();
-
-        if (count($authorizedPermissionIds) !== count(array_unique($permissionIds))) {
-            throw ValidationException::withMessages(['permissions' => 'Você não pode conceder permissões que não possui autorização para administrar.']);
-        }
     }
 }

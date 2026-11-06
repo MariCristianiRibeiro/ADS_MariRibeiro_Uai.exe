@@ -2,13 +2,12 @@
 
 use App\Models\Meeting;
 use App\Models\Project;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 it('creates a project using only its name and generates its internal code', function () {
-    $manager = User::factory()->create(['role' => 'manager']);
+    $manager = createUserWithPermissions(['projects.view', 'projects.create'], ['role' => 'manager']);
 
     $this->actingAs($manager)
         ->get(route('projects.create'))
@@ -34,7 +33,10 @@ it('creates a project using only its name and generates its internal code', func
 });
 
 it('returns to meeting creation with the new project selected', function () {
-    $manager = User::factory()->create(['role' => 'manager']);
+    $manager = createUserWithPermissions(
+        ['projects.view', 'projects.create', 'meetings.view', 'meetings.create'],
+        ['role' => 'manager'],
+    );
 
     $response = $this->actingAs($manager)
         ->post(route('projects.store'), [
@@ -54,14 +56,14 @@ it('returns to meeting creation with the new project selected', function () {
 });
 
 it('rejects a project without a name', function () {
-    $this->actingAs(User::factory()->create())
+    $this->actingAs(createUserWithPermissions(['projects.view', 'projects.create']))
         ->from(route('projects.create'))
         ->post(route('projects.store'), ['name' => ''])
         ->assertSessionHasErrors('name');
 });
 
 it('shows completed meeting time in the project report for its manager', function () {
-    $manager = User::factory()->create(['role' => 'manager']);
+    $manager = createUserWithPermissions(['reports.view', 'reports.costs'], ['role' => 'manager']);
     $project = Project::create([
         'manager_id' => $manager->id,
         'name' => 'Projeto sem equipe',

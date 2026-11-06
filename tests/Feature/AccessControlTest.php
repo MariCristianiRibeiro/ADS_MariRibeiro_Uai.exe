@@ -2,6 +2,7 @@
 
 use App\Models\AccessProfile;
 use App\Models\JobPosition;
+use App\Models\Meeting;
 use App\Models\Permission;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -12,7 +13,7 @@ it('restricts profile administration and persists profile permissions', function
     $regularUser = User::factory()->create(['role' => 'participant']);
     $this->actingAs($regularUser)->get(route('access-profiles.index'))->assertForbidden();
 
-    $administrator = User::factory()->create(['role' => 'admin']);
+    $administrator = createAdminUser();
     $permission = Permission::firstOrCreate(['name' => 'participants.view'], ['resource' => 'participants', 'action' => 'view', 'description' => 'Visualizar participantes']);
     $this->actingAs($administrator)->post(route('access-profiles.store'), [
         'name' => 'Leitor',
@@ -25,7 +26,7 @@ it('restricts profile administration and persists profile permissions', function
 });
 
 it('assigns a cargo and access profile to a managed user', function () {
-    $administrator = User::factory()->create(['role' => 'admin']);
+    $administrator = createAdminUser();
     $user = User::factory()->create(['role' => 'participant']);
     $jobPosition = JobPosition::create(['name' => 'Analista', 'code' => 'ANL', 'hourly_rate' => 75, 'active' => true]);
     $profile = AccessProfile::create(['name' => 'Editor', 'active' => true]);
@@ -45,7 +46,7 @@ it('assigns a cargo and access profile to a managed user', function () {
 });
 
 it('prevents users from changing their own access assignments', function () {
-    $administrator = User::factory()->create(['role' => 'admin']);
+    $administrator = createAdminUser();
     $profile = AccessProfile::create(['name' => 'Privilegiado', 'active' => true]);
 
     $this->actingAs($administrator)->put(route('users.update', $administrator), [
@@ -61,7 +62,7 @@ it('prevents users from changing their own access assignments', function () {
 });
 
 it('updates and deactivates profiles and cargos without deleting assigned records', function () {
-    $administrator = User::factory()->create(['role' => 'admin']);
+    $administrator = createAdminUser();
     $profile = AccessProfile::create(['name' => 'Rascunho', 'active' => true]);
     $permission = Permission::firstOrCreate(['name' => 'reports.view'], ['resource' => 'reports', 'action' => 'view', 'description' => 'Visualizar relatórios']);
 
@@ -88,7 +89,7 @@ it('updates and deactivates profiles and cargos without deleting assigned record
 });
 
 it('generates a unique internal code for each cargo without user input', function () {
-    $administrator = User::factory()->create(['role' => 'admin']);
+    $administrator = createAdminUser();
 
     $this->actingAs($administrator)->post(route('job-positions.store'), [
         'name' => 'Analista de Sistemas',
@@ -105,7 +106,7 @@ it('generates a unique internal code for each cargo without user input', functio
 });
 
 it('blocks a staff user from elevating their own legacy role', function () {
-    $hrUser = User::factory()->create(['role' => 'hr']);
+    $hrUser = createUserWithPermissions(['users.administer'], ['role' => 'hr']);
 
     $this->actingAs($hrUser)->put(route('users.update', $hrUser), [
         'name' => $hrUser->name,
@@ -134,7 +135,7 @@ it('does not let profile editors grant permissions they do not hold', function (
     $user = User::factory()->create(['role' => 'participant']);
     $profile = AccessProfile::create(['name' => 'Editor de perfis', 'active' => true]);
     $manageProfiles = Permission::firstOrCreate(['name' => 'access_profiles.create'], ['resource' => 'access_profiles', 'action' => 'create', 'description' => 'Criar perfis']);
-    $reportPermission = Permission::create(['name' => 'reports.export', 'resource' => 'reports', 'action' => 'export', 'description' => 'Exportar relatórios']);
+    $reportPermission = Permission::create(['name' => 'finance.export', 'resource' => 'finance', 'action' => 'export', 'description' => 'Exportar financeiro']);
     $profile->permissions()->attach($manageProfiles);
     $user->accessProfiles()->attach($profile);
 
@@ -145,7 +146,7 @@ it('does not let profile editors grant permissions they do not hold', function (
 });
 
 it('assigns a selected profile through the administrative participant form', function () {
-    $administrator = User::factory()->create(['role' => 'admin']);
+    $administrator = createAdminUser();
     $profile = AccessProfile::create(['name' => 'Equipe operacional', 'active' => true]);
 
     $this->actingAs($administrator)->post(route('participants.store'), [
@@ -159,4 +160,191 @@ it('assigns a selected profile through the administrative participant form', fun
 
     $member = User::where('email', 'pessoa@example.com')->firstOrFail();
     expect($member->accessProfiles()->whereKey($profile->id)->exists())->toBeTrue();
+});
+
+it('does not grant system permissions from the organizational role alone', function () {
+    $administratorRole = User::factory()->create(['role' => 'admin']);
+
+    $this->actingAs($administratorRole)->get(route('users.index'))->assertForbidden();
+    expect($administratorRole->hasPermission('users.administer'))->toBeFalse();
+});
+
+it('composes permissions from multiple profiles regardless of the user role', function () {
+    $user = User::factory()->create(['role' => 'manager']);
+
+    foreach (['teams.view', 'reports.costs'] as $permissionName) {
+        [$resource, $action] = explode('.', $permissionName, 2);
+        $permission = Permission::firstOrCreate(
+            ['name' => $permissionName],
+            ['resource' => $resource, 'action' => $action, 'description' => $permissionName],
+        );
+        $profile = AccessProfile::create(['name' => 'Acesso '.$permissionName, 'active' => true]);
+        $profile->permissions()->attach($permission);
+        $user->accessProfiles()->attach($profile);
+    }
+
+    expect($user->hasPermission('teams.view'))->toBeTrue()
+        ->and($user->hasPermission('reports.costs'))->toBeTrue()
+        ->and($user->hasPermission('users.administer'))->toBeFalse();
+});
+
+it('allows authorized administrators to register new permission definitions', function () {
+    $administrator = createAdminUser();
+
+    $this->actingAs($administrator)->post(route('access-profiles.permissions.store'), [
+        'resource' => 'finance',
+        'action' => 'view',
+        'description' => 'Visualizar financeiro',
+    ])->assertRedirect(route('access-profiles.index'));
+
+    $this->assertDatabaseHas('permissions', [
+        'name' => 'finance.view',
+        'resource' => 'finance',
+        'action' => 'view',
+        'description' => 'Visualizar financeiro',
+    ]);
+});
+
+it('allows delegated permission administrators to grant permissions they do not hold', function () {
+    $delegate = createUserWithPermissions(
+        ['access_profiles.create', 'access_profiles.administer'],
+        ['role' => 'director_network'],
+    );
+    $costPermission = Permission::firstOrCreate(
+        ['name' => 'reports.costs'],
+        ['resource' => 'reports', 'action' => 'costs', 'description' => 'Visualizar custos reais'],
+    );
+
+    $this->actingAs($delegate)->post(route('access-profiles.store'), [
+        'name' => 'Acesso financeiro delegado',
+        'permissions' => [$costPermission->id],
+    ])->assertRedirect(route('access-profiles.index'));
+
+    $profile = AccessProfile::where('name', 'Acesso financeiro delegado')->firstOrFail();
+    expect($profile->permissions()->whereKey($costPermission->id)->exists())->toBeTrue();
+});
+
+it('does not let user managers assign profiles with permissions they cannot grant', function () {
+    $userManager = createUserWithPermissions(['users.administer'], ['role' => 'hr']);
+    $target = User::factory()->create(['role' => 'participant']);
+    $profile = AccessProfile::create(['name' => 'Custos reais', 'active' => true]);
+    $permission = Permission::firstOrCreate(
+        ['name' => 'reports.costs'],
+        ['resource' => 'reports', 'action' => 'costs', 'description' => 'Visualizar custos reais'],
+    );
+    $profile->permissions()->attach($permission);
+
+    $this->actingAs($userManager)->put(route('users.update', $target), [
+        'name' => $target->name,
+        'email' => $target->email,
+        'status' => 'active',
+        'role' => 'participant',
+        'profile_ids' => [$profile->id],
+        'supervisor_ids' => [],
+    ])->assertSessionHasErrors('profile_ids');
+
+    expect($target->fresh()->accessProfiles()->whereKey($profile->id)->exists())->toBeFalse();
+});
+
+it('keeps meeting cost data out of pages without the costs permission', function () {
+    $jobPosition = JobPosition::create(['name' => 'Financeiro', 'code' => 'FIN', 'hourly_rate' => 247, 'active' => true]);
+    $owner = createUserWithPermissions(['meetings.view', 'meetings.create'], ['role' => 'manager']);
+    $attendee = User::factory()->create(['job_position_id' => $jobPosition->id]);
+    $meeting = Meeting::create([
+        'user_id' => $owner->id,
+        'title' => 'Reunião de orçamento',
+        'date' => now()->toDateString(),
+        'status' => 'scheduled',
+    ]);
+    $meeting->users()->attach($attendee, ['attendance_status' => 'confirmed']);
+
+    $this->actingAs($owner)->get(route('meetings.create'))
+        ->assertOk()
+        ->assertDontSee('hourlyRate', false)
+        ->assertDontSee('Valor-hora dos participantes')
+        ->assertDontSee('Custo previsto');
+
+    $this->get(route('dashboard'))
+        ->assertOk()
+        ->assertDontSee('hourlyRate', false)
+        ->assertDontSee('Investimento acumulado');
+
+    $costViewer = createUserWithPermissions(
+        ['meetings.view', 'meetings.create', 'reports.costs'],
+        ['role' => 'manager'],
+    );
+
+    $this->actingAs($costViewer)->get(route('meetings.create'))
+        ->assertOk()
+        ->assertSee('hourlyRate', false)
+        ->assertSee('Valor-hora dos participantes');
+});
+
+it('records profile assignments and permission changes in the audit history', function () {
+    $administrator = createAdminUser();
+    $profile = AccessProfile::create(['name' => 'Relatórios', 'active' => true]);
+    $permission = Permission::firstOrCreate(
+        ['name' => 'reports.view'],
+        ['resource' => 'reports', 'action' => 'view', 'description' => 'Visualizar relatórios'],
+    );
+
+    $this->actingAs($administrator)->put(route('access-profiles.update', $profile), [
+        'name' => $profile->name,
+        'active' => '1',
+        'permissions' => [$permission->id],
+    ])->assertRedirect(route('access-profiles.index'));
+
+    $this->post(route('users.store'), [
+        'name' => 'Pessoa com perfil',
+        'email' => 'perfil@example.com',
+        'password' => 'Senha@123',
+        'status' => 'active',
+        'role' => 'participant',
+        'profile_ids' => [$profile->id],
+        'supervisor_ids' => [],
+    ])->assertRedirect(route('users.index'));
+
+    $assignedUser = User::where('email', 'perfil@example.com')->firstOrFail();
+
+    $this->put(route('access-profiles.update', $profile), [
+        'name' => $profile->name,
+        'active' => '1',
+        'permissions' => [],
+    ])->assertRedirect(route('access-profiles.index'));
+
+    $this->put(route('users.update', $assignedUser), [
+        'name' => $assignedUser->name,
+        'email' => $assignedUser->email,
+        'status' => 'active',
+        'role' => 'participant',
+        'clear_profiles' => '1',
+        'supervisor_ids' => [],
+    ])->assertRedirect(route('users.index'));
+
+    $this->assertDatabaseHas('access_control_audits', [
+        'actor_id' => $administrator->id,
+        'subject_user_id' => $assignedUser->id,
+        'access_profile_id' => $profile->id,
+        'event' => 'profile_assigned',
+    ]);
+    $this->assertDatabaseHas('access_control_audits', [
+        'actor_id' => $administrator->id,
+        'subject_user_id' => $assignedUser->id,
+        'access_profile_id' => $profile->id,
+        'event' => 'profile_removed',
+    ]);
+    $this->assertDatabaseHas('access_control_audits', [
+        'actor_id' => $administrator->id,
+        'access_profile_id' => $profile->id,
+        'permission_id' => $permission->id,
+        'event' => 'permission_granted',
+    ]);
+    $this->assertDatabaseHas('access_control_audits', [
+        'actor_id' => $administrator->id,
+        'access_profile_id' => $profile->id,
+        'permission_id' => $permission->id,
+        'event' => 'permission_revoked',
+    ]);
+
+    $this->get(route('access-profiles.audit'))->assertOk()->assertSee('Histórico de acessos');
 });

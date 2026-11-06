@@ -1,5 +1,8 @@
 <?php
 
+use App\Models\AccessProfile;
+use App\Models\Permission;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -47,4 +50,38 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+function createAdminUser(array $attributes = []): User
+{
+    $user = User::factory()->create(array_merge(['role' => 'admin'], $attributes));
+    $profile = AccessProfile::where('name', 'Administrador geral')->firstOrFail();
+    $user->accessProfiles()->attach($profile);
+
+    return $user;
+}
+
+/**
+ * @param  array<int, string>  $permissionNames
+ */
+function createUserWithPermissions(array $permissionNames, array $attributes = []): User
+{
+    $user = User::factory()->create($attributes);
+    $profile = AccessProfile::create([
+        'name' => 'Perfil de teste '.$user->id,
+        'active' => true,
+    ]);
+
+    foreach ($permissionNames as $permissionName) {
+        [$resource, $action] = explode('.', $permissionName, 2);
+        $permission = Permission::firstOrCreate(
+            ['name' => $permissionName],
+            ['resource' => $resource, 'action' => $action, 'description' => $permissionName],
+        );
+        $profile->permissions()->attach($permission);
+    }
+
+    $user->accessProfiles()->attach($profile);
+
+    return $user;
 }

@@ -1,10 +1,12 @@
 <?php
 
+use App\Http\Controllers\AccessControlAuditController;
 use App\Http\Controllers\AccessProfileController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\JobPositionController;
 use App\Http\Controllers\MeetingController;
 use App\Http\Controllers\ParticipantController;
+use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ReportController;
@@ -43,6 +45,9 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('can:manage-access-profiles')->group(function () {
         Route::get('/access-profiles', [AccessProfileController::class, 'index'])->middleware('permission:access_profiles.view')->name('access-profiles.index');
+        Route::get('/access-profiles/audit', [AccessControlAuditController::class, 'index'])->middleware('permission:access_profiles.administer')->name('access-profiles.audit');
+        Route::get('/access-profiles/permissions/create', [PermissionController::class, 'create'])->middleware('permission:access_profiles.administer')->name('access-profiles.permissions.create');
+        Route::post('/access-profiles/permissions', [PermissionController::class, 'store'])->middleware('permission:access_profiles.administer')->name('access-profiles.permissions.store');
         Route::get('/access-profiles/create', [AccessProfileController::class, 'create'])->middleware('permission:access_profiles.create')->name('access-profiles.create');
         Route::post('/access-profiles', [AccessProfileController::class, 'store'])->middleware('permission:access_profiles.create')->name('access-profiles.store');
         Route::get('/access-profiles/{accessProfile}/edit', [AccessProfileController::class, 'edit'])->middleware('permission:access_profiles.edit')->name('access-profiles.edit');

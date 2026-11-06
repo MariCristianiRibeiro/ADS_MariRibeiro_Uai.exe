@@ -82,14 +82,6 @@ class User extends Authenticatable
 
     public function hasPermission(string $permission): bool
     {
-        if ($this->isAdmin()) {
-            return true;
-        }
-
-        if ($this->role === 'hr' && preg_match('/^(users|access_profiles|job_positions|teams)\./', $permission) === 1) {
-            return true;
-        }
-
         return $this->accessProfiles()->where('access_profiles.active', true)
             ->whereHas('permissions', fn ($query) => $query->where('permissions.name', $permission))
             ->exists();
@@ -126,7 +118,7 @@ class User extends Authenticatable
 
     public function canViewCosts(): bool
     {
-        return in_array($this->role, ['admin', 'executive', 'director', 'director_commercial', 'director_network', 'manager'], true);
+        return $this->hasPermission('reports.costs');
     }
 
     public function isManager(): bool

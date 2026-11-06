@@ -7,6 +7,7 @@ use App\Models\Directorate;
 use App\Models\JobPosition;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\AccessControlService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -54,7 +55,7 @@ class UserManagementController extends Controller
         return view('users.create', $this->structureOptions());
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, AccessControlService $accessControl): RedirectResponse
     {
         $rules = [
             'name' => ['required', 'string', 'max:255'],
@@ -80,14 +81,14 @@ class UserManagementController extends Controller
         $supervisorIds = collect($validated['supervisor_ids'] ?? [])->unique()->values();
         $this->validateSupervisors($validated['role'], $supervisorIds);
 
-        DB::transaction(function () use ($validated, $supervisorIds): void {
+        DB::transaction(function () use ($validated, $supervisorIds, $request, $accessControl): void {
             $user = User::create([
                 ...collect($validated)->except('supervisor_ids', 'profile_ids', 'password')->all(),
                 'password' => Hash::make($validated['password']),
             ]);
 
             $this->syncSupervisors($user, $supervisorIds);
-            $user->accessProfiles()->sync($validated['profile_ids'] ?? []);
+            $accessControl->syncUserProfiles($request->user(), $user, $validated['profile_ids'] ?? []);
             if (! empty($validated['profile_ids'])) {
                 Log::notice('Access profiles assigned to user', ['actor_id' => auth()->id(), 'user_id' => $user->id, 'profile_ids' => $validated['profile_ids']]);
             }
@@ -116,7 +117,7 @@ class UserManagementController extends Controller
         ]);
     }
 
-    public function update(Request $request, User $user): RedirectResponse
+    public function update(Request $request, User $user, AccessControlService $accessControl): RedirectResponse
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -146,14 +147,14 @@ class UserManagementController extends Controller
             throw ValidationException::withMessages(['role' => 'O último administrador não pode perder o acesso administrativo.']);
         }
         $this->validateSupervisors($validated['role'], $supervisorIds, $user->id);
-        DB::transaction(function () use ($validated, $user, $supervisorIds): void {
+        DB::transaction(function () use ($validated, $user, $supervisorIds, $request, $accessControl): void {
             $user->update(collect($validated)->except('supervisor_ids', 'profile_ids', 'clear_profiles')->all());
             $this->syncSupervisors($user, $supervisorIds);
             if (! empty($validated['clear_profiles'])) {
-                $user->accessProfiles()->detach();
+                $accessControl->syncUserProfiles($request->user(), $user, []);
                 Log::notice('Access profiles removed from user', ['actor_id' => auth()->id(), 'user_id' => $user->id]);
             } elseif (! empty($validated['profile_ids'])) {
-                $user->accessProfiles()->sync($validated['profile_ids'] ?? []);
+                $accessControl->syncUserProfiles($request->user(), $user, $validated['profile_ids']);
                 Log::notice('Access profiles updated for user', ['actor_id' => auth()->id(), 'user_id' => $user->id, 'profile_ids' => $validated['profile_ids']]);
             }
         });

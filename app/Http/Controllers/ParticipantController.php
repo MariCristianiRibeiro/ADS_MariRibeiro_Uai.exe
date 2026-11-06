@@ -7,6 +7,7 @@ use App\Models\JobPosition;
 use App\Models\Participant;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\AccessControlService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -62,7 +63,7 @@ class ParticipantController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, AccessControlService $accessControl): RedirectResponse
     {
         $request->merge(['type' => $request->input('type', 'guest')]);
 
@@ -85,7 +86,7 @@ class ParticipantController extends Controller
         }
         $validated = $request->validate($rules);
 
-        DB::transaction(function () use ($validated): void {
+        DB::transaction(function () use ($validated, $request, $accessControl): void {
             $team = isset($validated['team_id']) ? Team::findOrFail($validated['team_id']) : null;
 
             $user = User::create([
@@ -99,7 +100,7 @@ class ParticipantController extends Controller
                 'job_position_id' => $validated['job_position_id'] ?? null,
             ]);
             if (! empty($validated['profile_ids'])) {
-                $user->accessProfiles()->sync($validated['profile_ids']);
+                $accessControl->syncUserProfiles($request->user(), $user, $validated['profile_ids']);
                 Log::notice('Access profiles assigned to participant account', ['actor_id' => Auth::id(), 'user_id' => $user->id, 'profile_ids' => $validated['profile_ids']]);
             }
 
@@ -132,7 +133,7 @@ class ParticipantController extends Controller
         ]);
     }
 
-    public function update(Request $request, Participant $participant): RedirectResponse
+    public function update(Request $request, Participant $participant, AccessControlService $accessControl): RedirectResponse
     {
         abort_unless($request->user()->hasPermission('participants.edit'), 403);
 
@@ -170,7 +171,7 @@ class ParticipantController extends Controller
             throw ValidationException::withMessages(['profile_ids' => 'Você não pode alterar seus próprios perfis de acesso.']);
         }
 
-        DB::transaction(function () use ($participant, $validated): void {
+        DB::transaction(function () use ($participant, $validated, $request, $accessControl): void {
             $team = isset($validated['team_id']) ? Team::findOrFail($validated['team_id']) : null;
             $memberUserId = $validated['member_user_id'] ?? null;
 
@@ -184,10 +185,10 @@ class ParticipantController extends Controller
                     'job_position_id' => $validated['job_position_id'] ?? null,
                 ]);
                 if (! empty($validated['clear_profiles'])) {
-                    $memberUser->accessProfiles()->detach();
+                    $accessControl->syncUserProfiles($request->user(), $memberUser, []);
                     Log::notice('Access profiles removed from participant account', ['actor_id' => Auth::id(), 'user_id' => $memberUser->id]);
                 } elseif (! empty($validated['profile_ids'])) {
-                    $memberUser->accessProfiles()->sync($validated['profile_ids']);
+                    $accessControl->syncUserProfiles($request->user(), $memberUser, $validated['profile_ids']);
                     Log::notice('Access profiles updated for participant account', ['actor_id' => Auth::id(), 'user_id' => $memberUser->id, 'profile_ids' => $validated['profile_ids']]);
                 }
             }

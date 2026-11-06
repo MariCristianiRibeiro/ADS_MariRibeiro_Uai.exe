@@ -21,7 +21,7 @@ it('new user registers as participant pending financial setup', function () {
 });
 
 it('only administrators can access user management', function () {
-    $admin = User::factory()->create(['role' => 'admin', 'status' => 'active']);
+    $admin = createAdminUser(['status' => 'active']);
     $participant = User::factory()->create(['role' => 'participant', 'status' => 'pending_finance']);
 
     $this->actingAs($participant)
@@ -34,7 +34,7 @@ it('only administrators can access user management', function () {
 });
 
 it('administrators can search and filter users', function () {
-    $admin = User::factory()->create(['role' => 'admin', 'status' => 'active']);
+    $admin = createAdminUser(['status' => 'active']);
     User::factory()->create([
         'name' => 'Maria Participante',
         'email' => 'maria@example.com',
@@ -56,11 +56,11 @@ it('administrators can search and filter users', function () {
 });
 
 it('user can update user status from management screen', function () {
-    $admin = User::factory()->create(['role' => 'admin', 'status' => 'active']);
-    $user = User::factory()->create([ 'name' => 'Joao', 'email' => 'joao@example.com', 'role' => 'participant', 'status' => 'pending_finance' ]);
+    $admin = createAdminUser(['status' => 'active']);
+    $user = User::factory()->create(['name' => 'Joao', 'email' => 'joao@example.com', 'role' => 'participant', 'status' => 'pending_finance']);
 
     $this->actingAs($admin)
-        ->put('/users/' . $user->id, [
+        ->put('/users/'.$user->id, [
             'name' => 'Joao Atualizado',
             'email' => 'joao@example.com',
             'status' => 'active',

@@ -26,7 +26,7 @@
                         </div>
 
                         <div>
-                            <label for="role" class="block text-sm font-medium text-gray-700">Perfil</label>
+                            <label for="role" class="block text-sm font-medium text-gray-700">Perfil organizacional</label>
                             <select id="role" name="role" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 <option value="participant" {{ old('role', $user->role ?? 'participant') === 'participant' ? 'selected' : '' }}>Participante / Organizador</option>
                                 <option value="admin" {{ old('role', $user->role ?? 'participant') === 'admin' ? 'selected' : '' }}>Administrador</option>
@@ -36,6 +36,7 @@
                                 <option value="director_network" {{ old('role', $user->role) === 'director_network' ? 'selected' : '' }}>Diretor de Rede</option>
                                 <option value="manager" {{ old('role', $user->role) === 'manager' ? 'selected' : '' }}>Gestor</option>
                             </select>
+                            <p class="mt-1 text-xs text-gray-500">Define a posição na hierarquia, não os acessos ao sistema. Configure os acessos em Perfis de acesso.</p>
                             @error('role') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
                         </div>
 
@@ -55,7 +56,18 @@
                             @error('supervisor_ids') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6"><div><label for="directorate_id" class="block text-sm font-medium text-gray-700">Diretoria</label><select id="directorate_id" name="directorate_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"><option value="">Não atribuída</option>@foreach ($directorates as $directorate)<option value="{{ $directorate->id }}" {{ old('directorate_id', $user->directorate_id) == $directorate->id ? 'selected' : '' }}>{{ $directorate->name }}</option>@endforeach</select></div><div><label for="team_id" class="block text-sm font-medium text-gray-700">Equipe</label><select id="team_id" name="team_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"><option value="">Não atribuída</option>@foreach ($teams as $team)<option value="{{ $team->id }}" {{ old('team_id', $user->team_id) == $team->id ? 'selected' : '' }}>{{ $team->name }}</option>@endforeach</select></div><div><label for="job_position_id" class="block text-sm font-medium text-gray-700">Cargo</label><select id="job_position_id" name="job_position_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"><option value="">Não atribuído</option>@foreach ($jobPositions as $jobPosition)<option value="{{ $jobPosition->id }}" {{ old('job_position_id', $user->job_position_id) == $jobPosition->id ? 'selected' : '' }}>{{ $jobPosition->name }} - R$ {{ number_format($jobPosition->hourly_rate, 2, ',', '.') }}/h</option>@endforeach</select></div></div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6"><div><label for="directorate_id" class="block text-sm font-medium text-gray-700">Diretoria</label><select id="directorate_id" name="directorate_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"><option value="">Não atribuída</option>@foreach ($directorates as $directorate)<option value="{{ $directorate->id }}" {{ old('directorate_id', $user->directorate_id) == $directorate->id ? 'selected' : '' }}>{{ $directorate->name }}</option>@endforeach</select></div><div><label for="team_id" class="block text-sm font-medium text-gray-700">Equipe</label><select id="team_id" name="team_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"><option value="">Não atribuída</option>@foreach ($teams as $team)<option value="{{ $team->id }}" {{ old('team_id', $user->team_id) == $team->id ? 'selected' : '' }}>{{ $team->name }}</option>@endforeach</select></div></div>
+
+                        <div>
+                            <label for="job_position_id" class="block text-sm font-medium text-gray-700">Cargo</label>
+                            <select id="job_position_id" name="job_position_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                                <option value="">Não atribuído</option>
+                                @foreach ($jobPositions as $jobPosition)
+                                    <option value="{{ $jobPosition->id }}" {{ old('job_position_id', $user->job_position_id) == $jobPosition->id ? 'selected' : '' }}>{{ $jobPosition->name }}</option>
+                                @endforeach
+                            </select>
+                            @error('job_position_id')<span class="text-sm text-red-600">{{ $message }}</span>@enderror
+                        </div>
 
                         <div><label for="profile_ids" class="block text-sm font-medium text-gray-700">Perfis de acesso</label><select id="profile_ids" name="profile_ids[]" multiple class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">@foreach ($accessProfiles as $profile)<option value="{{ $profile->id }}" @selected(in_array($profile->id, old('profile_ids', $selectedProfileIds)))>{{ $profile->name }}{{ $profile->active ? '' : ' (inativo)' }}</option>@endforeach</select><p class="mt-1 text-xs text-gray-500">Atribuir um perfil ativo substitui as seleções. Perfis existentes e inativos permanecem vinculados até serem removidos explicitamente.</p><label class="mt-2 flex items-center gap-2 text-sm"><input type="checkbox" name="clear_profiles" value="1" @checked(old('clear_profiles'))> Remover todos os perfis de acesso</label>@error('profile_ids')<span class="text-sm text-red-600">{{ $message }}</span>@enderror</div>
 

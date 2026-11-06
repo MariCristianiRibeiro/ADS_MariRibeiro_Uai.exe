@@ -13,7 +13,7 @@ it('redirects the home page to the login page', function () {
 });
 
 it('user can view meeting management page', function () {
-    $user = User::factory()->create();
+    $user = createUserWithPermissions(['meetings.view']);
 
     $this->actingAs($user)
         ->get('/meetings')
@@ -21,7 +21,7 @@ it('user can view meeting management page', function () {
 });
 
 it('dashboard lists only meetings created by the signed-in user', function () {
-    $owner = User::factory()->create();
+    $owner = createUserWithPermissions(['meetings.view', 'meetings.edit']);
     $otherUser = User::factory()->create();
 
     Meeting::create([
@@ -47,7 +47,7 @@ it('dashboard lists only meetings created by the signed-in user', function () {
 });
 
 it('uses the participant profile hourly rate for the running meeting cost', function () {
-    $owner = User::factory()->create();
+    $owner = createUserWithPermissions(['reports.costs']);
     $attendee = User::factory()->create(['hourly_rate' => null]);
     $participantProfile = Participant::create([
         'user_id' => $owner->id,
@@ -76,7 +76,7 @@ it('uses the participant profile hourly rate for the running meeting cost', func
 });
 
 it('starts and pauses a meeting timer while persisting its elapsed time', function () {
-    $owner = User::factory()->create();
+    $owner = createUserWithPermissions(['meetings.view', 'meetings.edit']);
     $meeting = Meeting::create([
         'user_id' => $owner->id,
         'title' => 'Reunião para cronometrar',
@@ -121,7 +121,10 @@ it('starts and pauses a meeting timer while persisting its elapsed time', functi
 it('finishes a running meeting, saves its final time and includes the final cost in reports', function () {
     $this->travelTo('2026-10-16 10:00:00');
 
-    $owner = User::factory()->create(['role' => 'executive', 'hourly_rate' => 120]);
+    $owner = createUserWithPermissions(
+        ['meetings.view', 'meetings.finish', 'reports.view', 'reports.costs'],
+        ['role' => 'executive', 'hourly_rate' => 120],
+    );
     $meeting = Meeting::create([
         'user_id' => $owner->id,
         'title' => 'Reunião finalizada no cronômetro',
@@ -159,7 +162,7 @@ it('finishes a running meeting, saves its final time and includes the final cost
 
 it('prevents users from starting another users meeting timer', function () {
     $owner = User::factory()->create();
-    $otherUser = User::factory()->create();
+    $otherUser = createUserWithPermissions(['meetings.view', 'meetings.edit', 'meetings.finish']);
     $meeting = Meeting::create([
         'user_id' => $owner->id,
         'title' => 'Reunião privada',
@@ -200,7 +203,7 @@ it('requires authentication to start a meeting timer', function () {
 });
 
 it('does not start a canceled meeting timer', function () {
-    $owner = User::factory()->create();
+    $owner = createUserWithPermissions(['meetings.view', 'meetings.edit']);
     $meeting = Meeting::create([
         'user_id' => $owner->id,
         'title' => 'Reunião cancelada',
@@ -220,7 +223,7 @@ it('does not start a canceled meeting timer', function () {
 });
 
 it('does not stop a timer that is not running', function () {
-    $owner = User::factory()->create();
+    $owner = createUserWithPermissions(['meetings.view', 'meetings.edit']);
     $meeting = Meeting::create([
         'user_id' => $owner->id,
         'title' => 'Reunião sem cronômetro',
@@ -241,7 +244,7 @@ it('does not stop a timer that is not running', function () {
 });
 
 it('user can create a meeting', function () {
-    $user = User::factory()->create();
+    $user = createUserWithPermissions(['meetings.view', 'meetings.create']);
 
     $this->actingAs($user)
         ->post('/meetings', [
@@ -262,7 +265,7 @@ it('user can create a meeting', function () {
 });
 
 it('stores actual meeting time and attendance confirmation separately from planned time', function () {
-    $owner = User::factory()->create(['role' => 'manager']);
+    $owner = createUserWithPermissions(['meetings.view', 'meetings.create', 'meetings.edit'], ['role' => 'manager']);
     $attendee = User::factory()->create(['role' => 'participant']);
 
     $this->actingAs($owner)
@@ -305,7 +308,7 @@ it('stores actual meeting time and attendance confirmation separately from plann
 });
 
 it('rejects invalid attendance statuses', function () {
-    $owner = User::factory()->create(['role' => 'manager']);
+    $owner = createUserWithPermissions(['meetings.view', 'meetings.create'], ['role' => 'manager']);
     $attendee = User::factory()->create(['role' => 'participant']);
 
     $this->actingAs($owner)
@@ -320,7 +323,7 @@ it('rejects invalid attendance statuses', function () {
 });
 
 it('user can attach participants to a meeting', function () {
-    $user = User::factory()->create();
+    $user = createUserWithPermissions(['meetings.view', 'meetings.create']);
     $participantA = Participant::create([
         'user_id' => $user->id,
         'name' => 'Ana Souza',
@@ -353,8 +356,8 @@ it('user can attach participants to a meeting', function () {
 });
 
 it('does not add the general administrator as a meeting participant', function () {
-    $user = User::factory()->create();
-    $admin = User::factory()->create(['role' => 'admin']);
+    $user = createUserWithPermissions(['meetings.view', 'meetings.create']);
+    $admin = createAdminUser();
 
     $this->actingAs($user)
         ->post('/meetings', [

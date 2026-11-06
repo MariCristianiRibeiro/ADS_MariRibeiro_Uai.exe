@@ -25,7 +25,7 @@
                         <option value="inactive" {{ $statusFilter === 'inactive' ? 'selected' : '' }}>Inativos</option>
                     </select>
                     <select name="role" class="w-full md:w-56 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                        <option value="all" {{ $roleFilter === 'all' ? 'selected' : '' }}>Todos os perfis</option>
+                        <option value="all" {{ $roleFilter === 'all' ? 'selected' : '' }}>Todos os perfis organizacionais</option>
                         <option value="admin" {{ $roleFilter === 'admin' ? 'selected' : '' }}>Administrador geral</option>
                         <option value="hr" {{ $roleFilter === 'hr' ? 'selected' : '' }}>RH</option>
                         <option value="executive" {{ $roleFilter === 'executive' ? 'selected' : '' }}>Executivos</option>
@@ -45,7 +45,7 @@
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">E-mail</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Perfil</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Perfil organizacional</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Superior responsável 1</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Superior responsável 2</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
