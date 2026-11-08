@@ -28,6 +28,7 @@
                     <input type="text" name="search" value="{{ $search }}" placeholder="Buscar por título, local ou observações" class="w-full md:w-2/3 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                     <select name="status" class="w-full md:w-1/4 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                         <option value="all" {{ $statusFilter === 'all' ? 'selected' : '' }}>Todos</option>
+                        <option value="draft" {{ $statusFilter === 'draft' ? 'selected' : '' }}>Rascunhos</option>
                         <option value="scheduled" {{ $statusFilter === 'scheduled' ? 'selected' : '' }}>Agendadas</option>
                         <option value="ongoing" {{ $statusFilter === 'ongoing' ? 'selected' : '' }}>Em andamento</option>
                         <option value="completed" {{ $statusFilter === 'completed' ? 'selected' : '' }}>Concluídas</option>
@@ -84,20 +85,26 @@
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm">
                                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                                            @if($meeting->status === 'scheduled') bg-blue-100 text-blue-800
+                                            @if($meeting->status === 'draft') bg-gray-100 text-gray-800
+                                            @elseif($meeting->status === 'scheduled') bg-blue-100 text-blue-800
                                             @elseif($meeting->status === 'ongoing') bg-yellow-100 text-yellow-800
                                             @elseif($meeting->status === 'completed') bg-green-100 text-green-800
                                             @else bg-red-100 text-red-800 @endif">
-                                            {{ $meeting->status }}
+                                            {{ ['draft' => 'Rascunho', 'scheduled' => 'Agendada', 'ongoing' => 'Em andamento', 'completed' => 'Concluída', 'canceled' => 'Cancelada'][$meeting->status] ?? $meeting->status }}
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <a href="{{ route('meetings.show', $meeting) }}" class="text-teal-700 hover:text-teal-900 mr-3">Detalhes</a>
                                         <a href="{{ route('meetings.edit', $meeting) }}" class="text-indigo-600 hover:text-indigo-900 mr-3">Editar</a>
-                                        <form action="{{ route('meetings.destroy', $meeting) }}" method="POST" class="inline">
+                                        @can('meetings.edit')
+                                        @if (! in_array($meeting->status, ['completed', 'canceled'], true))
+                                        <form action="{{ route('meetings.cancel', $meeting) }}" method="POST" class="inline">
                                             @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="text-red-600 hover:text-red-900" onclick="return confirm('Deseja excluir esta reunião?')">Excluir</button>
+                                            @method('PATCH')
+                                            <button type="submit" class="text-red-600 hover:text-red-900" onclick="return confirm('Deseja cancelar esta reunião?')">Cancelar</button>
                                         </form>
+                                        @endif
+                                        @endcan
                                     </td>
                                 </tr>
                             @empty

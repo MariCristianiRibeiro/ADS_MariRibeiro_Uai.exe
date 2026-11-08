@@ -285,7 +285,7 @@ it('stores actual meeting time and attendance confirmation separately from plann
     expect($meeting->duration_minutes)->toBe(90)
         ->and($meeting->actual_duration_seconds)->toBe(3665);
 
-    $this->assertDatabaseHas('meeting_user', [
+    $this->assertDatabaseHas('meeting_participants', [
         'meeting_id' => $meeting->id,
         'user_id' => $attendee->id,
         'attendance_status' => 'confirmed',
@@ -294,8 +294,8 @@ it('stores actual meeting time and attendance confirmation separately from plann
     $this->actingAs($owner)
         ->get('/meetings/'.$meeting->id.'/edit')
         ->assertOk()
-        ->assertSee('Chamada de presença')
-        ->assertSee('Presença confirmada')
+        ->assertSee('Participantes')
+        ->assertSee('Confirmação')
         ->assertSee('Tempo realizado')
         ->assertDontSee('Pausar');
 

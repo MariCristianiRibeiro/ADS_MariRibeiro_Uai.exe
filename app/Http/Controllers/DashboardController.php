@@ -16,18 +16,18 @@ class DashboardController extends Controller
         $canViewCosts = Auth::user()->canViewCosts();
         $meetings = Meeting::query()
             ->where('user_id', Auth::id())
-            ->with(['users.jobPosition', 'users.participantProfile', 'participants.memberUser.jobPosition'])
+            ->with(['users.jobPosition', 'users.participantProfile', 'participants.memberUser.jobPosition', 'meetingParticipants.costSnapshot', 'meetingParticipants.user.jobPosition'])
             ->latest()
             ->get()
             ->map(function (Meeting $meeting) use ($costCalculator, $canViewCosts): array {
                 $attendees = $meeting->users->isNotEmpty()
-                    ? $meeting->users->map(function (User $user) use ($costCalculator, $canViewCosts): array {
+                    ? $meeting->users->map(function (User $user) use ($meeting, $costCalculator, $canViewCosts): array {
                         $attendee = [
                             'name' => $user->name,
                             'attendanceStatus' => $user->pivot->attendance_status,
                         ];
                         if ($canViewCosts) {
-                            $attendee['hourlyRate'] = $costCalculator->userRate($user);
+                            $attendee['hourlyRate'] = $costCalculator->meetingParticipantRate($meeting, $user);
                         }
 
                         return $attendee;

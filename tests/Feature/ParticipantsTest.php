@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Directorate;
+use App\Models\JobPosition;
 use App\Models\Participant;
 use App\Models\Team;
 use App\Models\User;
@@ -18,6 +19,12 @@ it('user can view participant management page', function () {
 
 it('user can create a participant', function () {
     $user = createUserWithPermissions(['participants.view', 'participants.create']);
+    $jobPosition = JobPosition::create([
+        'name' => 'Analista financeiro',
+        'code' => 'AN-FIN',
+        'hourly_rate' => '125.50',
+        'active' => true,
+    ]);
 
     $this->actingAs($user)
         ->post('/participants', [
@@ -26,7 +33,7 @@ it('user can create a participant', function () {
             'password' => 'Senha@123',
             'phone' => '11999999999',
             'status' => 'active',
-            'hourly_rate' => '125.50',
+            'job_position_id' => $jobPosition->id,
         ])
         ->assertRedirect('/participants');
 
@@ -47,12 +54,11 @@ it('user can create a participant', function () {
         'user_id' => $user->id,
         'member_user_id' => $account->id,
         'email' => 'maria@example.com',
-        'hourly_rate' => '125.50',
     ]);
 
     $this->assertDatabaseHas('users', [
         'id' => $account->id,
-        'hourly_rate' => '125.50',
+        'job_position_id' => $jobPosition->id,
     ]);
 });
 

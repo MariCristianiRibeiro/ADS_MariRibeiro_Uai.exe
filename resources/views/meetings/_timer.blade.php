@@ -1,8 +1,9 @@
 @php
     $selectedParticipantIds = collect($selectedParticipantIds ?? [])->map(fn ($id) => (int) $id)->all();
     $canViewCosts = auth()->user()->canViewCosts();
+    $meetingParticipants = ($meeting ?? null)?->meetingParticipants?->keyBy('user_id') ?? collect();
     $timerParticipants = $members
-        ->map(function ($member) use ($selectedParticipantIds, $canViewCosts): array {
+        ->map(function ($member) use ($selectedParticipantIds, $canViewCosts, $meetingParticipants): array {
             $participant = [
                 'id' => $member->id,
                 'name' => $member->name,
@@ -10,7 +11,7 @@
                 'attendanceStatus' => old('attendance.' . $member->id, ($meeting ?? null)?->users?->firstWhere('id', $member->id)?->pivot?->attendance_status ?? 'pending'),
             ];
             if ($canViewCosts) {
-                $participant['hourlyRate'] = (float) ($member->jobPosition?->hourly_rate ?? 0);
+                $participant['hourlyRate'] = (float) ($meetingParticipants->get($member->id)?->costSnapshot?->hourly_rate ?? $member->jobPosition?->hourly_rate ?? 0);
             }
 
             return $participant;

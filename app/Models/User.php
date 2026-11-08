@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -57,7 +58,14 @@ class User extends Authenticatable
 
     public function meetings()
     {
-        return $this->belongsToMany(Meeting::class, 'meeting_user')->withTimestamps();
+        return $this->belongsToMany(Meeting::class, 'meeting_participants')
+            ->withPivot(['id', 'role', 'invitation_status', 'confirmation_status', 'attendance_status'])
+            ->withTimestamps();
+    }
+
+    public function meetingParticipants(): HasMany
+    {
+        return $this->hasMany(MeetingParticipant::class);
     }
 
     public function directorate()

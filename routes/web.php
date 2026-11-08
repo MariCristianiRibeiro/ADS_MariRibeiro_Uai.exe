@@ -32,6 +32,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/meetings/{meeting}/timer/start', [MeetingController::class, 'startTimer'])->middleware('permission:meetings.view')->name('meetings.timer.start');
     Route::post('/meetings/{meeting}/timer/stop', [MeetingController::class, 'stopTimer'])->middleware('permission:meetings.view')->name('meetings.timer.stop');
     Route::post('/meetings/{meeting}/finish', [MeetingController::class, 'finish'])->middleware('permission:meetings.view')->name('meetings.finish');
+    Route::patch('/meetings/{meeting}/cancel', [MeetingController::class, 'cancel'])->middleware('permission:meetings.view')->name('meetings.cancel');
+    Route::post('/meetings/{meeting}/action-items', [MeetingController::class, 'storeActionItem'])->middleware('permission:meetings.view')->name('meetings.action-items.store');
+    Route::patch('/meetings/{meeting}/action-items/{actionItem}', [MeetingController::class, 'updateActionItem'])->middleware('permission:meetings.view')->name('meetings.action-items.update');
+    Route::post('/meetings/{meeting}/decisions', [MeetingController::class, 'storeDecision'])->middleware('permission:meetings.view')->name('meetings.decisions.store');
+    Route::put('/meetings/{meeting}/conclusion', [MeetingController::class, 'saveConclusion'])->middleware('permission:meetings.view')->name('meetings.conclusion.save');
     Route::resource('meetings', MeetingController::class)->middleware('permission:meetings.view');
     Route::get('/reports/meetings', [ReportController::class, 'meetings'])->middleware('permission:reports.view')->name('reports.meetings');
 
