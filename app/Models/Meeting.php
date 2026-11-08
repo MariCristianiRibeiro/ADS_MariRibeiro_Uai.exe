@@ -152,6 +152,11 @@ class Meeting extends Model
         return $this->hasMany(MeetingHistory::class)->latest('created_at');
     }
 
+    public function analyses(): HasMany
+    {
+        return $this->hasMany(MeetingAnalysis::class)->latest();
+    }
+
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);

@@ -37,6 +37,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/meetings/{meeting}/action-items/{actionItem}', [MeetingController::class, 'updateActionItem'])->middleware('permission:meetings.view')->name('meetings.action-items.update');
     Route::post('/meetings/{meeting}/decisions', [MeetingController::class, 'storeDecision'])->middleware('permission:meetings.view')->name('meetings.decisions.store');
     Route::put('/meetings/{meeting}/conclusion', [MeetingController::class, 'saveConclusion'])->middleware('permission:meetings.view')->name('meetings.conclusion.save');
+    Route::post('/meetings/{meeting}/analyses', [MeetingController::class, 'analyzeTranscript'])->middleware('permission:meetings.view')->name('meetings.analyses.store');
     Route::resource('meetings', MeetingController::class)->middleware('permission:meetings.view');
     Route::get('/reports/meetings', [ReportController::class, 'meetings'])->middleware('permission:reports.view')->name('reports.meetings');
 

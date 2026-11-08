@@ -8,6 +8,7 @@ use App\Models\MeetingActionItem;
 use App\Models\Participant;
 use App\Models\Project;
 use App\Models\User;
+use App\Services\MeetingTranscriptAnalyzer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -200,13 +201,54 @@ class MeetingController extends Controller
             'actionItems.directorate',
             'actionItems.dependencies',
             'history.actor',
+            'analyses.requester',
         ]);
 
         return view('meetings.show', [
             'meeting' => $meeting,
             'members' => $meeting->users()->orderBy('name')->get(),
             'directorates' => Directorate::query()->where('active', true)->orderBy('name')->get(),
+            'openAiConfigured' => filled(config('services.openai.api_key')),
         ]);
+    }
+
+    public function analyzeTranscript(Request $request, Meeting $meeting, MeetingTranscriptAnalyzer $analyzer): RedirectResponse
+    {
+        $this->assertCanManageMeeting($request, $meeting);
+
+        $validated = $request->validate([
+            'transcript' => ['required', 'string', 'min:20', 'max:100000'],
+        ]);
+
+        if (blank(config('services.openai.api_key'))) {
+            return back()->withErrors([
+                'transcript' => 'A integração ChatGPT ainda não está configurada. Defina OPENAI_API_KEY no servidor.',
+            ])->withInput();
+        }
+
+        $analysis = $meeting->analyses()->create([
+            'requested_by' => $request->user()->id,
+            'transcript' => $validated['transcript'],
+            'provider' => 'openai',
+            'model' => config('services.openai.model'),
+            'status' => 'processing',
+        ]);
+
+        try {
+            $result = $analyzer->analyze($validated['transcript']);
+            $analysis->update([...$result, 'status' => 'completed', 'completed_at' => now()]);
+        } catch (\Throwable $exception) {
+            $analysis->update([
+                'status' => 'failed',
+                'error_message' => $exception->getMessage(),
+            ]);
+
+            return back()->withErrors([
+                'transcript' => 'Não foi possível concluir a análise agora. Tente novamente mais tarde.',
+            ])->withInput();
+        }
+
+        return back()->with('success', 'Transcrição analisada pelo ChatGPT. Revise as sugestões antes de cadastrá-las.');
     }
 
     public function edit(Meeting $meeting): View
