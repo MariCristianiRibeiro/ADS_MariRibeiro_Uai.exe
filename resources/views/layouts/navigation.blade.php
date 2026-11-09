@@ -26,6 +26,7 @@
                     @can('meetings.view')<x-nav-link :href="route('meetings.index')" :active="request()->routeIs('meetings.*')">
                         {{ __('Reuniões') }}
                     </x-nav-link>@endcan
+                    @can('reports.view')<x-nav-link :href="route('reports.meetings.dashboard')" :active="request()->routeIs('reports.meetings.*')">Indicadores</x-nav-link>@endcan
                     @can('projects.view')<x-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*')">
                         {{ __('Projetos') }}
                     </x-nav-link>@endcan
@@ -107,6 +108,7 @@
             @can('meetings.view')<x-responsive-nav-link :href="route('meetings.index')" :active="request()->routeIs('meetings.*')">
                 {{ __('Reuniões') }}
             </x-responsive-nav-link>@endcan
+            @can('reports.view')<x-responsive-nav-link :href="route('reports.meetings.dashboard')" :active="request()->routeIs('reports.meetings.*')">Indicadores</x-responsive-nav-link>@endcan
             @can('projects.view')<x-responsive-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*')">
                 {{ __('Projetos') }}
             </x-responsive-nav-link>@endcan

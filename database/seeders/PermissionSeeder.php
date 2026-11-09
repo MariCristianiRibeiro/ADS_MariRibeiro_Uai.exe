@@ -23,6 +23,8 @@ class PermissionSeeder extends Seeder
             'teams' => ['view' => 'Visualizar equipes', 'create' => 'Cadastrar equipes', 'manage' => 'Administrar equipes'],
         ];
 
+        $permissions['reports']['individuals'] = 'Visualizar dados individuais em relatórios';
+
         foreach ($permissions as $resource => $actions) {
             foreach ($actions as $action => $description) {
                 Permission::updateOrCreate(['resource' => $resource, 'action' => $action], ['name' => $resource.'.'.$action, 'description' => $description]);

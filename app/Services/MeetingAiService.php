@@ -8,7 +8,7 @@ use Throwable;
 
 class MeetingAiService
 {
-    private const PROMPT_VERSION = 'meeting-insights-v1';
+    private const PROMPT_VERSION = 'meeting-insights-v2';
 
     /** @return array{result: array<string, mixed>, provider: string, model: string, response_id: ?string, usage: array<string, mixed>, prompt_version: string} */
     public function analyze(string $stage, array $context): array
@@ -36,6 +36,9 @@ class MeetingAiService
             default => 'Analise os dados de reunião fornecidos.',
         };
         $systemPrompt = 'Você é um assistente de análise de reuniões. Responda em português e somente com JSON válido no formato solicitado. '.$stageGoal.' Use apenas dados fornecidos. Não invente falas, participantes, fatos, conclusões, padrões históricos ou valores financeiros. Os indicadores financeiros recebidos são calculados pelo sistema: apenas contextualize-os, nunca recalcule ou altere valores. Se faltarem evidências, declare isso em missing_information e reduza confidence. Não atribua declarações a pessoas sem evidência textual explícita. Não tome decisões nem crie encaminhamentos; apenas sugira.';
+        if ($stage === 'dashboard') {
+            $systemPrompt .= ' For dashboard analysis, explain aggregate indicators and selected period using only the supplied data. Highlight opportunities, areas with higher investment, recurrence patterns, pending item risks, and optimizations. Compare preserved predictions with actual outcomes only if both are supplied. Do not expose people or infer a weekly work capacity that is absent. Do not invent or cite numbers, percentages, counts, or financial values; describe trends qualitatively and point to backend indicators.';
+        }
         if ($stage === 'follow_up') {
             $systemPrompt .= ' Compare a previsão inicial preservada com o resultado real e os encaminhamentos atualizados. Use os dados fornecidos sobre prazo, tempo de resolução, reaberturas, encontros adicionais, custo e horas acumulados. Não declare conclusão final enquanto houver demandas pendentes.';
         }
@@ -76,6 +79,9 @@ class MeetingAiService
 
             $result = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
             $this->validateResult($result);
+            if ($stage === 'dashboard' && $this->containsDashboardNumbers($result)) {
+                throw new RuntimeException('A resposta da IA incluiu números em texto; os indicadores numéricos devem vir dos cálculos do sistema.');
+            }
 
             $providerUsage = $provider === 'gemini' ? $response->json('usageMetadata', []) : $response->json('usage', []);
             if (! is_array($providerUsage)) {
@@ -201,5 +207,14 @@ class MeetingAiService
         if (preg_match('/(?:R\s?\$|US\$|\bBRL\b|\bUSD\b|\breais\b)/iu', $text) === 1) {
             throw new RuntimeException('A resposta incluiu valores financeiros em texto; esses valores devem vir dos cálculos do sistema.');
         }
+    }
+
+    /** @param array<string, mixed> $result */
+    private function containsDashboardNumbers(array $result): bool
+    {
+        unset($result['confidence']);
+        $text = json_encode($result, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+
+        return preg_match('/\d/u', $text) === 1;
     }
 }

@@ -43,6 +43,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/meetings/adjust', [MeetingController::class, 'adjust'])->middleware('permission:meetings.view')->name('meetings.adjust');
     Route::resource('meetings', MeetingController::class)->middleware('permission:meetings.view');
     Route::get('/reports/meetings', [ReportController::class, 'meetings'])->middleware('permission:reports.view')->name('reports.meetings');
+    Route::get('/reports/meetings/dashboard', [ReportController::class, 'dashboard'])->middleware('permission:reports.view')->name('reports.meetings.dashboard');
+    Route::post('/reports/meetings/dashboard/analyze', [ReportController::class, 'analyze'])->middleware('permission:reports.view')->name('reports.meetings.analyze');
+    Route::get('/reports/meetings/dashboard/export', [ReportController::class, 'export'])->middleware('permission:reports.export')->name('reports.meetings.export');
 
     Route::middleware('can:manage-users')->group(function () {
         Route::get('/users', [UserManagementController::class, 'index'])->name('users.index');

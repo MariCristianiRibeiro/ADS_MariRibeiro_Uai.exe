@@ -53,18 +53,18 @@ class MeetingCostCalculator
         $actualHours = $meeting->actual_duration_seconds / 3600;
 
         if ($meeting->meetingParticipants->isNotEmpty()) {
-            return $meeting->meetingParticipants->sum(fn (MeetingParticipant $participant) => $participant->attendance_status === 'confirmed'
+            return $meeting->meetingParticipants->sum(fn (MeetingParticipant $participant) => in_array($participant->attendance_status, ['confirmed', 'present'], true)
                 ? $actualHours * (float) ($participant->costSnapshot?->hourly_rate ?? ($participant->user ? $this->userRate($participant->user) : 0))
                 : 0);
         }
 
         if ($meeting->users->isNotEmpty()) {
-            return $meeting->users->sum(fn (User $user) => $user->pivot->attendance_status === 'confirmed'
+            return $meeting->users->sum(fn (User $user) => in_array($user->pivot->attendance_status, ['confirmed', 'present'], true)
                 ? $actualHours * $this->userRate($user)
                 : 0);
         }
 
-        return $meeting->participants->sum(fn (Participant $participant) => $participant->pivot->attendance_status === 'confirmed'
+        return $meeting->participants->sum(fn (Participant $participant) => in_array($participant->pivot->attendance_status, ['confirmed', 'present'], true)
             ? $actualHours * $this->participantRate($participant)
             : 0);
     }
