@@ -37,6 +37,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/meetings/{meeting}/action-items/{actionItem}', [MeetingController::class, 'updateActionItem'])->middleware('permission:meetings.view')->name('meetings.action-items.update');
     Route::post('/meetings/{meeting}/decisions', [MeetingController::class, 'storeDecision'])->middleware('permission:meetings.view')->name('meetings.decisions.store');
     Route::put('/meetings/{meeting}/conclusion', [MeetingController::class, 'saveConclusion'])->middleware('permission:meetings.view')->name('meetings.conclusion.save');
+    Route::put('/meetings/{meeting}/participant-feedback', [MeetingController::class, 'storeParticipantFeedback'])->middleware('permission:meetings.view')->name('meetings.participant-feedback.save');
     Route::post('/meetings/{meeting}/analyses', [MeetingController::class, 'analyzeMeetingContext'])->middleware('permission:meetings.view')->name('meetings.analyses.store');
     Route::post('/meetings/preview', [MeetingController::class, 'preview'])->middleware('permission:meetings.view')->name('meetings.preview');
     Route::post('/meetings/adjust', [MeetingController::class, 'adjust'])->middleware('permission:meetings.view')->name('meetings.adjust');

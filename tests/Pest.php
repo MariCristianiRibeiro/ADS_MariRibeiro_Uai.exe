@@ -4,6 +4,7 @@ use App\Models\AccessProfile;
 use App\Models\Permission;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /*
@@ -84,4 +85,25 @@ function createUserWithPermissions(array $permissionNames, array $attributes = [
     $user->accessProfiles()->attach($profile);
 
     return $user;
+}
+
+/** @param array<string, mixed> $data */
+function postMeetingAfterPreview(TestCase $test, User $user, array $data): TestResponse
+{
+    $data = array_merge([
+        'organizer_id' => $user->id,
+        'duration_minutes' => 60,
+        'priority' => 'normal',
+        'recurrence_type' => 'single',
+        'status' => 'scheduled',
+    ], $data);
+    $preview = $test->actingAs($user)->post(route('meetings.preview'), $data);
+
+    if (! $preview->isOk()) {
+        return $preview;
+    }
+
+    return $test->actingAs($user)->post(route('meetings.store'), [
+        'preflight_token' => $preview->viewData('preflightToken'),
+    ]);
 }

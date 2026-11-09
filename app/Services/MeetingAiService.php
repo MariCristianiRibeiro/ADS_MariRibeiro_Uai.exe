@@ -36,6 +36,10 @@ class MeetingAiService
             default => 'Analise os dados de reunião fornecidos.',
         };
         $systemPrompt = 'Você é um assistente de análise de reuniões. Responda em português e somente com JSON válido no formato solicitado. '.$stageGoal.' Use apenas dados fornecidos. Não invente falas, participantes, fatos, conclusões, padrões históricos ou valores financeiros. Os indicadores financeiros recebidos são calculados pelo sistema: apenas contextualize-os, nunca recalcule ou altere valores. Se faltarem evidências, declare isso em missing_information e reduza confidence. Não atribua declarações a pessoas sem evidência textual explícita. Não tome decisões nem crie encaminhamentos; apenas sugira.';
+        if ($stage === 'follow_up') {
+            $systemPrompt .= ' Compare a previsão inicial preservada com o resultado real e os encaminhamentos atualizados. Use os dados fornecidos sobre prazo, tempo de resolução, reaberturas, encontros adicionais, custo e horas acumulados. Não declare conclusão final enquanto houver demandas pendentes.';
+        }
+        $systemPrompt .= ' Trate análise post_meeting como preliminar enquanto houver demandas pendentes. Não use avaliações individuais isoladas para classificar desempenho pessoal.';
         $baseUrl = rtrim((string) config("services.ai.providers.{$provider}.base_url"), '/');
 
         try {

@@ -277,7 +277,7 @@ it('keeps meeting cost data out of pages without the costs permission', function
     $this->actingAs($costViewer)->get(route('meetings.create'))
         ->assertOk()
         ->assertSee('hourlyRate', false)
-        ->assertSee('Valor-hora dos participantes');
+        ->assertSee('Custo estimado por participante');
 });
 
 it('records profile assignments and permission changes in the audit history', function () {

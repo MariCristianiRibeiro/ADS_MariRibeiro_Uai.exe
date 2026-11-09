@@ -256,7 +256,7 @@ class MeetingController extends Controller
     public function show(Meeting $meeting, Request $request, MeetingAiService $aiService): View
     {
         abort_unless($request->user()->hasPermission('meetings.view'), 403);
-        abort_unless($meeting->user_id === $request->user()->id, 403);
+        abort_unless($meeting->user_id === $request->user()->id || $meeting->meetingParticipants()->where('user_id', $request->user()->id)->exists(), 403);
 
         $meeting->load([
             'project',
@@ -274,40 +274,61 @@ class MeetingController extends Controller
             'actionItems.dependencies',
             'history.actor',
             'analyses.requester',
+            'participantFeedback.user',
+            'meetingParticipants.user',
+            'actionItems.history.actor',
         ]);
+        $learningMeetings = Meeting::query()->where('user_id', $meeting->user_id)->where('status', 'completed')
+            ->where(function ($query) use ($meeting): void {
+                $query->whereKey($meeting->id)->orWhereHas('actionItems', fn ($items) => $items->where('follow_up_meeting_id', $meeting->id));
+            })->with('meetingParticipants')->get();
 
         return view('meetings.show', [
             'meeting' => $meeting,
             'members' => $meeting->users()->orderBy('name')->get(),
+            'additionalMeetings' => Meeting::query()->where('user_id', $meeting->user_id)->where('status', 'completed')->where('id', '<>', $meeting->id)->orderByDesc('date')->get(['id', 'title', 'date']),
             'directorates' => Directorate::query()->where('active', true)->orderBy('name')->get(),
             'aiConfigured' => $aiService->isConfigured(),
             'aiProvider' => $aiService->provider(),
             'aiModel' => $aiService->configuredModel(),
+            'currentParticipantFeedback' => $meeting->participantFeedback->firstWhere('user_id', $request->user()->id),
+            'learningMetrics' => [
+                'meetings_count' => $learningMeetings->count(),
+                'actual_seconds' => (int) $learningMeetings->sum('actual_duration_seconds'),
+                'collaborator_hours' => $learningMeetings->sum(fn (Meeting $related): float => ((float) ($related->actual_duration_seconds ?? 0) / 3600) * $related->meetingParticipants->whereIn('attendance_status', ['present', 'confirmed'])->count()),
+                'actual_cost' => $request->user()->canViewCosts() ? $learningMeetings->sum(fn (Meeting $related): float => app(MeetingCostCalculator::class)->total($related)) : null,
+            ],
         ]);
     }
 
     public function analyzeMeetingContext(Request $request, Meeting $meeting, MeetingAiService $aiService): RedirectResponse
     {
         $this->assertCanManageMeeting($request, $meeting);
+        if ($request->filled('transcript') && ! $request->filled('analysis_notes')) {
+            $request->merge(['analysis_notes' => $request->input('transcript'), 'analysis_type' => $request->input('analysis_type', 'post_meeting')]);
+        }
         $notesRules = $request->input('analysis_type') === 'pre_meeting'
             ? ['nullable', 'string', 'max:100000']
             : ['required', 'string', 'min:10', 'max:100000'];
         $validated = $request->validate([
-            'analysis_type' => ['required', Rule::in(['pre_meeting', 'during_meeting', 'post_meeting'])],
+            'analysis_type' => ['required', Rule::in(['pre_meeting', 'during_meeting', 'post_meeting', 'follow_up'])],
             'analysis_notes' => $notesRules,
         ]);
 
         $stage = $validated['analysis_type'];
         if (($stage === 'pre_meeting' && ! in_array($meeting->status, ['draft', 'scheduled'], true))
             || ($stage === 'during_meeting' && $meeting->status !== 'ongoing')
-            || ($stage === 'post_meeting' && $meeting->status !== 'completed')) {
+            || (in_array($stage, ['post_meeting', 'follow_up'], true) && $meeting->status !== 'completed')) {
             return back()->withErrors(['analysis_notes' => 'A etapa de análise não corresponde ao status atual da reunião.'])->withInput();
+        }
+        if ($stage === 'follow_up' && $meeting->actionItems()->whereNotIn('status', ['completed', 'canceled'])->exists()) {
+            return back()->withErrors(['analysis_notes' => 'A anÃ¡lise complementar fica disponÃ­vel depois da conclusÃ£o dos encaminhamentos.'])->withInput();
         }
         if ($stage !== 'pre_meeting' && blank($validated['analysis_notes'] ?? null)) {
             return back()->withErrors(['analysis_notes' => 'Registre as informações da reunião antes de pedir a análise.'])->withInput();
         }
 
-        $meeting->loadMissing(['meetingParticipants.user.jobPosition', 'meetingParticipants.costSnapshot', 'decisions', 'actionItems.responsible', 'conclusion']);
+        $meeting->loadMissing(['meetingParticipants.user.jobPosition', 'meetingParticipants.costSnapshot', 'decisions', 'actionItems.responsible', 'actionItems.history', 'conclusion', 'participantFeedback']);
         $inputData = $this->buildMeetingAnalysisContext($meeting, $stage, (string) ($validated['analysis_notes'] ?? ''));
         $version = (int) $meeting->analyses()->where('analysis_type', $stage)->max('version') + 1;
         $analysis = $meeting->analyses()->create([
@@ -330,7 +351,7 @@ class MeetingController extends Controller
                 'error_message' => 'A chamada de IA falhou. Verifique conexão, provedor e chave de API.',
             ]);
 
-            return back()->withErrors(['analysis_notes' => $exception->getMessage()])->withInput();
+            return back()->withErrors(['analysis_notes' => 'Nao foi possivel gerar a analise agora. Verifique a configuracao e Tente novamente.'])->withInput();
         }
 
         return back()->with('success', 'Análise gerada pela IA. Revise as sugestões; nada foi salvo como decisão ou encaminhamento.');
@@ -426,6 +447,9 @@ class MeetingController extends Controller
             'due_date' => ['nullable', 'date'],
             'priority' => ['required', Rule::in(['low', 'normal', 'high', 'urgent'])],
             'requires_follow_up' => ['sometimes', 'boolean'],
+            'expected_result' => ['nullable', 'string'],
+            'needs_additional_meeting' => ['sometimes', 'boolean'],
+            'follow_up_meeting_id' => ['nullable', 'integer', Rule::exists('meetings', 'id')->where('user_id', $meeting->user_id)],
             'dependencies' => ['nullable', 'array'],
             'dependencies.*' => [
                 'integer',
@@ -436,8 +460,11 @@ class MeetingController extends Controller
         $dependencies = collect($validated['dependencies'] ?? [])->map(fn ($id): int => (int) $id)->unique();
         unset($validated['dependencies']);
 
-        $actionItem = $meeting->actionItems()->create($validated + ['status' => 'open']);
-        $actionItem->dependencies()->sync($dependencies->all());
+        DB::transaction(function () use ($meeting, $validated, $dependencies, $request): void {
+            $actionItem = $meeting->actionItems()->create($validated + ['status' => 'open']);
+            $actionItem->dependencies()->sync($dependencies->all());
+            $actionItem->history()->create(['actor_id' => $request->user()->id, 'event' => 'created', 'changes' => $actionItem->only(['title', 'description', 'responsible_user_id', 'directorate_id', 'due_date', 'priority', 'expected_result']) + ['dependencies' => $dependencies->all()], 'created_at' => now()]);
+        });
 
         return back()->with('success', 'Encaminhamento cadastrado.');
     }
@@ -450,13 +477,33 @@ class MeetingController extends Controller
         $validated = $request->validate([
             'status' => ['required', Rule::in(['open', 'in_progress', 'blocked', 'completed', 'canceled'])],
             'delivered_result' => ['nullable', 'string'],
+            'expected_result' => ['nullable', 'string'],
             'due_date' => ['nullable', 'date'],
             'requires_follow_up' => ['sometimes', 'boolean'],
+            'delay_reason' => ['nullable', 'string'],
+            'needs_additional_meeting' => ['sometimes', 'boolean'],
+            'follow_up_meeting_id' => ['nullable', 'integer', Rule::exists('meetings', 'id')->where('user_id', $meeting->user_id)],
         ]);
 
         $validated['requires_follow_up'] = $request->boolean('requires_follow_up');
+        $before = $actionItem->only(array_keys($validated));
+        $wasCompleted = $actionItem->status === 'completed';
         $validated['completed_at'] = $validated['status'] === 'completed' ? ($actionItem->completed_at ?? now()) : null;
-        $actionItem->update($validated);
+        $changes = [];
+        DB::transaction(function () use ($request, $validated, $actionItem, $before, $wasCompleted, &$changes): void {
+            $actionItem->update($validated);
+            foreach (array_unique([...array_keys($validated), 'completed_at']) as $field) {
+                $old = $before[$field] ?? null;
+                $new = $actionItem->getAttribute($field);
+                if ((string) $old !== (string) $new) {
+                    $changes[$field] = ['old' => $old, 'new' => $new];
+                }
+            }
+            if ($changes !== []) {
+                $event = $wasCompleted && $actionItem->status !== 'completed' ? 'reopened' : ($actionItem->status === 'completed' ? 'completed' : 'updated');
+                $actionItem->history()->create(['actor_id' => $request->user()->id, 'event' => $event, 'changes' => $changes, 'created_at' => now()]);
+            }
+        });
 
         return back()->with('success', 'Encaminhamento atualizado.');
     }
@@ -487,15 +534,57 @@ class MeetingController extends Controller
         $validated = $request->validate([
             'summary' => ['nullable', 'string'],
             'outcome' => ['nullable', 'string'],
+            'objective_achievement' => ['nullable', Rule::in(['yes', 'partially', 'no'])],
+            'decisions_count' => ['nullable', 'integer', 'min:0'],
+            'completed_topics_count' => ['nullable', 'integer', 'min:0'],
+            'pending_topics' => ['nullable', 'string'],
+            'objective_changed' => ['nullable', 'boolean'],
+            'duration_sufficient' => ['nullable', 'boolean'],
+            'time_well_used' => ['nullable', 'boolean'],
+            'replaceable_by_email' => ['nullable', 'boolean'],
+            'needs_follow_up' => ['nullable', 'boolean'],
+            'productivity_score' => ['nullable', 'integer', 'between:1,5'],
+            'investment_return_score' => ['nullable', 'integer', 'between:1,5'],
+            'participation' => ['nullable', 'array'],
+            'participation.*.attendance_status' => ['nullable', Rule::in(['pending', 'present', 'absent', 'confirmed'])],
+            'participation.*.participation_effective' => ['nullable', 'boolean'],
+            'participation.*.relevant_contribution' => ['nullable', 'boolean'],
+            'participation.*.contributed_to_decision' => ['nullable', 'boolean'],
+            'participation.*.participation_necessary' => ['nullable', 'boolean'],
+            'participation.*.self_rating' => ['nullable', 'integer', 'between:1,5'],
         ]);
 
-        $meeting->conclusion()->updateOrCreate([], [
-            ...$validated,
-            'recorded_by' => $request->user()->id,
-            'concluded_at' => now(),
-        ]);
+        $participation = $validated['participation'] ?? [];
+        unset($validated['participation']);
+
+        DB::transaction(function () use ($meeting, $validated, $request, $participation): void {
+            $meeting->conclusion()->updateOrCreate([], [
+                ...$validated,
+                'recorded_by' => $request->user()->id,
+                'concluded_at' => now(),
+            ]);
+            foreach ($participation as $participantId => $values) {
+                $participant = $meeting->meetingParticipants()->findOrFail($participantId);
+                $participant->update(collect($values)->only(['attendance_status', 'participation_effective', 'relevant_contribution', 'contributed_to_decision', 'participation_necessary', 'self_rating'])->all());
+            }
+        });
 
         return back()->with('success', 'Conclusão registrada.');
+    }
+
+    public function storeParticipantFeedback(Request $request, Meeting $meeting): RedirectResponse
+    {
+        abort_unless($meeting->meetingParticipants()->where('user_id', $request->user()->id)->exists(), 403);
+        abort_unless($meeting->status === 'completed' && $meeting->meetingParticipants()->where('user_id', $request->user()->id)->exists(), 403);
+        $validated = $request->validate([
+            'clarity_score' => ['nullable', 'integer', 'between:1,5'], 'objectivity_score' => ['nullable', 'integer', 'between:1,5'],
+            'organization_score' => ['nullable', 'integer', 'between:1,5'], 'time_management_score' => ['nullable', 'integer', 'between:1,5'],
+            'participation_score' => ['nullable', 'integer', 'between:1,5'], 'effectiveness_score' => ['nullable', 'integer', 'between:1,5'],
+            'suggestion' => ['nullable', 'string'], 'comments' => ['nullable', 'string'],
+        ]);
+        $meeting->participantFeedback()->updateOrCreate(['user_id' => $request->user()->id], [...$validated, 'submitted_at' => now()]);
+
+        return back()->with('success', 'Feedback registrado. As avaliações são usadas de forma agregada, sem classificar desempenho individual.');
     }
 
     /** @param array<string, mixed> $preflight
@@ -565,7 +654,10 @@ class MeetingController extends Controller
             'cargo' => $participant->user?->jobPosition?->name ?? 'Não informado',
             'papel' => $participant->role,
             'presenca' => $participant->attendance_status,
-            'participante_efetivo' => $participant->attendance_status === 'confirmed',
+            'participacao_efetiva' => $participant->participation_effective,
+            'contribuicao_relevante' => $participant->relevant_contribution,
+            'contribuiu_para_decisao' => $participant->contributed_to_decision,
+            'participacao_necessaria' => $participant->participation_necessary,
         ]);
         $decisions = $meeting->decisions->map(fn ($decision): array => [
             'titulo' => $decision->title,
@@ -580,7 +672,22 @@ class MeetingController extends Controller
             'prazo' => $item->due_date?->toDateString(),
             'responsavel_atribuido' => $item->responsible_user_id !== null,
             'resultado_entregue' => $item->delivered_result,
+            'resultado_esperado' => $item->expected_result,
+            'concluido_em' => $item->completed_at?->toIso8601String(),
+            'concluido_no_prazo' => $item->completed_at !== null && ($item->due_date === null || $item->completed_at->toDateString() <= $item->due_date->toDateString()),
+            'tempo_resolucao_horas' => $item->completed_at?->diffInHours($item->created_at),
+            'necessita_encontro_adicional' => $item->needs_additional_meeting,
+            'motivo_atraso' => $item->delay_reason,
+            'historico' => $item->history->map(fn ($event): array => ['evento' => $event->event, 'alteracoes' => $event->changes, 'data' => $event->created_at?->toIso8601String()])->values(),
         ]);
+        $pendingActions = $actions->whereNotIn('status', ['completed', 'canceled'])->values();
+        $feedback = $meeting->participantFeedback;
+        $initialForecast = $meeting->analyses->where('analysis_type', 'pre_meeting')->sortBy('version')->first();
+        $previousPostAnalysis = $meeting->analyses->firstWhere('analysis_type', 'post_meeting');
+        $accumulatedMeetings = Meeting::query()->where('user_id', $meeting->user_id)
+            ->where('status', 'completed')->where(function ($query) use ($meeting): void {
+                $query->whereKey($meeting->id)->orWhereHas('actionItems', fn ($items) => $items->where('follow_up_meeting_id', $meeting->id));
+            })->with('actionItems')->get();
         $elapsedSeconds = (int) ($meeting->actual_duration_seconds ?? 0);
         if ($meeting->timer_started_at !== null) {
             $elapsedSeconds += max(0, now()->diffInSeconds($meeting->timer_started_at, absolute: true));
@@ -616,6 +723,15 @@ class MeetingController extends Controller
                 'duracao_reuniao_horas' => (int) $meeting->duration_minutes / 60,
             ];
         }
+        if (in_array($stage, ['post_meeting', 'follow_up'], true)) {
+            $actualMeetingHours = $meeting->actual_duration_seconds === null ? null : $meeting->actual_duration_seconds / 3600;
+            $presentParticipants = $meeting->meetingParticipants->whereIn('attendance_status', ['present', 'confirmed'])->count();
+            $financialMetrics = [
+                'custo_real_backend' => Auth::user()?->canViewCosts() && $actualMeetingHours !== null ? app(MeetingCostCalculator::class)->total($meeting) : null,
+                'horas_colaborador_reais' => $actualMeetingHours === null ? null : $actualMeetingHours * $presentParticipants,
+                'duracao_real_reuniao_horas' => $actualMeetingHours,
+            ];
+        }
         $weekStart = $meeting->date?->copy()->startOfWeek()->toDateString();
         $weekEnd = $meeting->date?->copy()->endOfWeek()->toDateString();
         $weeklyAgenda = Meeting::query()->where('user_id', $meeting->user_id)
@@ -642,7 +758,7 @@ class MeetingController extends Controller
             'anotacoes_manuais_desta_execucao' => $notes,
             'decisoes_registradas' => $decisions->values(),
             'encaminhamentos_registrados' => $actions->values(),
-            'assuntos_pendentes' => $actions->whereNotIn('status', ['completed', 'canceled'])->values(),
+            'assuntos_pendentes' => $pendingActions,
             'indicadores_financeiros_calculados_pelo_sistema' => $financialMetrics,
             'impacto_agenda_semanal' => [
                 'reunioes_com_participantes' => $weeklyAgenda->count(),
@@ -651,8 +767,35 @@ class MeetingController extends Controller
             'resultado_informado' => [
                 'resumo' => $meeting->conclusion?->summary,
                 'resultado' => $meeting->conclusion?->outcome,
+                'objetivo_alcancado' => $meeting->conclusion?->objective_achievement,
+                'objetivo_alterado' => $meeting->conclusion?->objective_changed,
+                'duracao_suficiente' => $meeting->conclusion?->duration_sufficient,
+                'tempo_bem_aproveitado' => $meeting->conclusion?->time_well_used,
+                'poderia_ser_email' => $meeting->conclusion?->replaceable_by_email,
+                'necessita_outro_encontro' => $meeting->conclusion?->needs_follow_up,
+                'decisoes' => $meeting->conclusion?->decisions_count,
+                'assuntos_concluidos' => $meeting->conclusion?->completed_topics_count,
+                'assuntos_pendentes' => $meeting->conclusion?->pending_topics,
+                'avaliacao_produtividade' => $meeting->conclusion?->productivity_score,
+                'retorno_investimento_percebido' => $meeting->conclusion?->investment_return_score,
             ],
-            'avaliacoes_dos_participantes' => null,
+            'avaliacoes_agregadas_dos_participantes' => $feedback->isEmpty() ? null : $feedback->map(fn ($entry): array => $entry->only(['clarity_score', 'objectivity_score', 'organization_score', 'time_management_score', 'participation_score', 'effectiveness_score', 'suggestion', 'comments']))->values(),
+            'previsao_inicial_preservada' => $initialForecast === null ? null : [
+                'versao' => $initialForecast->version,
+                'dados_utilizados' => $initialForecast->input_data,
+                'resultado_da_previsao' => $initialForecast->result,
+            ],
+            'analise_pos_reuniao_anterior_preservada' => $previousPostAnalysis?->result,
+            'analise_preliminar' => $stage === 'post_meeting' && $pendingActions->isNotEmpty(),
+            'retroalimentacao_real' => [
+                'encontros_concluidos_relacionados' => $accumulatedMeetings->count(),
+                'tempo_total_investido_segundos' => (int) $accumulatedMeetings->sum('actual_duration_seconds'),
+                'horas_colaborador_acumuladas' => $accumulatedMeetings->sum(fn (Meeting $related): float => ((float) ($related->actual_duration_seconds ?? 0) / 3600) * $related->meetingParticipants()->whereIn('attendance_status', ['present', 'confirmed'])->count()),
+                'encaminhamentos_total' => $actions->count(),
+                'encaminhamentos_concluidos_no_prazo' => $actions->where('status', 'completed')->where('concluido_no_prazo', true)->count(),
+                'encaminhamentos_reabertos' => $actions->filter(fn (array $item): bool => collect($item['historico'])->contains(fn (array $event): bool => $event['evento'] === 'reopened'))->count(),
+                'custo_acumulado_backend' => Auth::user()?->canViewCosts() ? $accumulatedMeetings->sum(fn (Meeting $related): float => app(MeetingCostCalculator::class)->total($related)) : null,
+            ],
             'historico_relacionado_acessivel' => $historicalMeetings->values(),
             'historico_suficiente_para_estimativa' => $historicalMeetings->count() >= 3,
             'observacao' => 'Nomes pessoais e conteúdo de outras reuniões fora do escopo acessível não são enviados. Sugestões exigem revisão humana.',

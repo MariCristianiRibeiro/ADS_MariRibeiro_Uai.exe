@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MeetingActionItem extends Model
 {
@@ -20,6 +21,7 @@ class MeetingActionItem extends Model
         'completed_at',
         'delivered_result',
         'requires_follow_up',
+        'expected_result', 'delay_reason', 'needs_additional_meeting', 'follow_up_meeting_id',
     ];
 
     protected function casts(): array
@@ -28,6 +30,7 @@ class MeetingActionItem extends Model
             'due_date' => 'date',
             'completed_at' => 'datetime',
             'requires_follow_up' => 'boolean',
+            'needs_additional_meeting' => 'boolean',
         ];
     }
 
@@ -54,5 +57,10 @@ class MeetingActionItem extends Model
     public function dependents(): BelongsToMany
     {
         return $this->belongsToMany(self::class, 'meeting_action_item_dependencies', 'depends_on_action_item_id', 'action_item_id');
+    }
+
+    public function history(): HasMany
+    {
+        return $this->hasMany(MeetingActionItemHistory::class, 'meeting_action_item_id')->latest('created_at');
     }
 }

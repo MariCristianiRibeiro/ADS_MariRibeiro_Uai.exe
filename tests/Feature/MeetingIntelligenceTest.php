@@ -32,7 +32,7 @@ it('stores a scheduled meeting, participant roles, and an immutable cost snapsho
         'directorate_id' => $directorate->id,
     ]);
 
-    $this->actingAs($owner)->post(route('meetings.store'), [
+    postMeetingAfterPreview($this, $owner, [
         'title' => 'Planejamento trimestral',
         'description' => 'Revisão de indicadores.',
         'category' => 'Planejamento',
@@ -203,7 +203,7 @@ it('rejects invalid meeting times and action item links outside the meeting', fu
         'description' => 'Não deve ser dependência.',
     ]);
 
-    $this->actingAs($owner)->post(route('meetings.store'), [
+    postMeetingAfterPreview($this, $owner, [
         'title' => 'Horário inválido',
         'organizer_id' => $owner->id,
         'date' => '2026-12-06',

@@ -103,7 +103,7 @@ it('shows up to two supervisors beside the profile in the people directory', fun
     $this->actingAs($admin)
         ->get('/users')
         ->assertOk()
-        ->assertSeeInOrder(['Perfil organizacional', 'Superior responsável 1', 'Superior responsável 2'])
+        ->assertSeeInOrder(['Papel organizacional', 'Superior responsável 1', 'Superior responsável 2'])
         ->assertSee('Carlos Gerente')
         ->assertSee('Ana Diretora');
 });

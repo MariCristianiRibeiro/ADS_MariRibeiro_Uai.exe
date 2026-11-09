@@ -137,6 +137,11 @@ class Meeting extends Model
         return $this->hasOne(MeetingConclusion::class);
     }
 
+    public function participantFeedback(): HasMany
+    {
+        return $this->hasMany(MeetingParticipantFeedback::class);
+    }
+
     public function decisions(): HasMany
     {
         return $this->hasMany(MeetingDecision::class);

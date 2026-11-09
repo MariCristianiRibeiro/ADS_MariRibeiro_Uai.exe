@@ -15,6 +15,7 @@ class MeetingParticipant extends Model
         'invitation_status',
         'confirmation_status',
         'attendance_status',
+        'participation_effective', 'relevant_contribution', 'contributed_to_decision', 'participation_necessary', 'self_rating',
     ];
 
     public function meeting(): BelongsTo
@@ -30,5 +31,13 @@ class MeetingParticipant extends Model
     public function costSnapshot(): HasOne
     {
         return $this->hasOne(MeetingCostSnapshot::class);
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'participation_effective' => 'boolean', 'relevant_contribution' => 'boolean',
+            'contributed_to_decision' => 'boolean', 'participation_necessary' => 'boolean', 'self_rating' => 'integer',
+        ];
     }
 }

@@ -3,7 +3,7 @@
     $investmentParticipants = $members->map(fn ($member): array => [
         'id' => $member->id,
         'name' => $member->name,
-        'hourlyRate' => (float) ($hourlyRates[$member->id] ?? 0),
+        ... (auth()->user()->canViewCosts() ? ['hourlyRate' => (float) ($hourlyRates[$member->id] ?? 0)] : []),
         'isSelected' => in_array($member->id, $selectedParticipantIds, true),
     ])->values();
 @endphp

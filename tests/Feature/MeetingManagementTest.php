@@ -27,14 +27,14 @@ it('dashboard lists only meetings created by the signed-in user', function () {
     Meeting::create([
         'user_id' => $owner->id,
         'title' => 'Reunião da minha equipe',
-        'date' => '2026-10-16',
+        'date' => '2026-12-16',
         'status' => 'scheduled',
     ]);
 
     Meeting::create([
         'user_id' => $otherUser->id,
         'title' => 'Reunião de outra equipe',
-        'date' => '2026-10-16',
+        'date' => '2026-12-16',
         'status' => 'scheduled',
     ]);
 
@@ -42,8 +42,7 @@ it('dashboard lists only meetings created by the signed-in user', function () {
         ->get(route('dashboard'))
         ->assertOk()
         ->assertSee('Reunião da minha equipe')
-        ->assertDontSee('Reunião de outra equipe')
-        ->assertSee('Iniciar cronômetro');
+        ->assertDontSee('Reunião de outra equipe');
 });
 
 it('uses the participant profile hourly rate for the running meeting cost', function () {
@@ -246,15 +245,14 @@ it('does not stop a timer that is not running', function () {
 it('user can create a meeting', function () {
     $user = createUserWithPermissions(['meetings.view', 'meetings.create']);
 
-    $this->actingAs($user)
-        ->post('/meetings', [
-            'title' => 'Reunião de alinhamento',
-            'date' => '2026-09-10',
-            'time' => '09:30',
-            'location' => 'Sala 2',
-            'status' => 'scheduled',
-            'notes' => 'Definir metas do sprint.',
-        ])
+    postMeetingAfterPreview($this, $user, [
+        'title' => 'Reunião de alinhamento',
+        'date' => '2026-09-10',
+        'time' => '09:30',
+        'location' => 'Sala 2',
+        'status' => 'scheduled',
+        'notes' => 'Definir metas do sprint.',
+    ])
         ->assertRedirect('/meetings');
 
     $this->assertDatabaseHas('meetings', [
@@ -268,19 +266,25 @@ it('stores actual meeting time and attendance confirmation separately from plann
     $owner = createUserWithPermissions(['meetings.view', 'meetings.create', 'meetings.edit'], ['role' => 'manager']);
     $attendee = User::factory()->create(['role' => 'participant']);
 
-    $this->actingAs($owner)
-        ->post('/meetings', [
-            'title' => 'Reunião com chamada',
-            'date' => '2026-09-15',
-            'duration_minutes' => 90,
-            'actual_duration_seconds' => 3665,
-            'status' => 'completed',
-            'participants' => [$attendee->id],
-            'attendance' => [$attendee->id => 'confirmed'],
-        ])
+    postMeetingAfterPreview($this, $owner, [
+        'title' => 'Reunião com chamada',
+        'date' => '2026-09-15',
+        'duration_minutes' => 90,
+
+        'status' => 'ongoing',
+        'participants' => [$attendee->id],
+        'attendance' => [$attendee->id => 'confirmed'],
+    ])
         ->assertRedirect('/meetings');
 
     $meeting = Meeting::where('title', 'Reunião com chamada')->firstOrFail();
+
+    $this->travelTo('2026-09-15 09:00:00');
+    $this->actingAs($owner)->postJson(route('meetings.timer.start', $meeting))->assertOk();
+    $this->travel(3665)->seconds();
+    $this->actingAs($owner)->postJson(route('meetings.timer.stop', $meeting))->assertOk();
+    $meeting->refresh();
+    $this->travelBack();
 
     expect($meeting->duration_minutes)->toBe(90)
         ->and($meeting->actual_duration_seconds)->toBe(3665);
@@ -296,14 +300,14 @@ it('stores actual meeting time and attendance confirmation separately from plann
         ->assertOk()
         ->assertSee('Participantes')
         ->assertSee('Confirmação')
-        ->assertSee('Tempo realizado')
+        ->assertSee('Investimento previsto')
         ->assertDontSee('Pausar');
 
     $this->actingAs($owner)
         ->get('/meetings/create')
         ->assertOk()
         ->assertSee('Duração prevista (minutos)')
-        ->assertSee('Iniciar cronômetro')
+        ->assertSee('Investimento previsto')
         ->assertDontSee('Pausar');
 });
 
@@ -311,14 +315,13 @@ it('rejects invalid attendance statuses', function () {
     $owner = createUserWithPermissions(['meetings.view', 'meetings.create'], ['role' => 'manager']);
     $attendee = User::factory()->create(['role' => 'participant']);
 
-    $this->actingAs($owner)
-        ->post('/meetings', [
-            'title' => 'Reunião com status inválido',
-            'date' => '2026-09-15',
-            'status' => 'scheduled',
-            'participants' => [$attendee->id],
-            'attendance' => [$attendee->id => 'maybe'],
-        ])
+    postMeetingAfterPreview($this, $owner, [
+        'title' => 'Reunião com status inválido',
+        'date' => '2026-09-15',
+        'status' => 'scheduled',
+        'participants' => [$attendee->id],
+        'attendance' => [$attendee->id => 'maybe'],
+    ])
         ->assertSessionHasErrors('attendance.'.$attendee->id);
 });
 
@@ -337,15 +340,14 @@ it('user can attach participants to a meeting', function () {
         'status' => 'pending',
     ]);
 
-    $this->actingAs($user)
-        ->post('/meetings', [
-            'title' => 'Sprint review',
-            'date' => '2026-09-15',
-            'time' => '15:00',
-            'location' => 'Sala 3',
-            'status' => 'scheduled',
-            'participants' => [$participantA->id, $participantB->id],
-        ])
+    postMeetingAfterPreview($this, $user, [
+        'title' => 'Sprint review',
+        'date' => '2026-09-15',
+        'time' => '15:00',
+        'location' => 'Sala 3',
+        'status' => 'scheduled',
+        'participants' => [$participantA->id, $participantB->id],
+    ])
         ->assertRedirect('/meetings');
 
     $meeting = Meeting::where('title', 'Sprint review')->first();
@@ -359,13 +361,12 @@ it('does not add the general administrator as a meeting participant', function (
     $user = createUserWithPermissions(['meetings.view', 'meetings.create']);
     $admin = createAdminUser();
 
-    $this->actingAs($user)
-        ->post('/meetings', [
-            'title' => 'Reunião sem administrador',
-            'date' => '2026-09-15',
-            'status' => 'scheduled',
-            'participants' => [$admin->id],
-        ])
+    postMeetingAfterPreview($this, $user, [
+        'title' => 'Reunião sem administrador',
+        'date' => '2026-09-15',
+        'status' => 'scheduled',
+        'participants' => [$admin->id],
+    ])
         ->assertRedirect('/meetings');
 
     $meeting = Meeting::where('title', 'Reunião sem administrador')->firstOrFail();
