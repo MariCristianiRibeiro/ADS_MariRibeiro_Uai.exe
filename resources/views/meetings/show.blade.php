@@ -22,8 +22,10 @@
                         <div><dt class="text-xs uppercase text-gray-500">Duração prevista</dt><dd class="mt-1 text-sm text-gray-800">{{ $meeting->duration_minutes }} minutos</dd></div>
                         <div><dt class="text-xs uppercase text-gray-500">Recorrência</dt><dd class="mt-1 text-sm text-gray-800">{{ $meeting->recurrence_type === 'recurring' ? ($meeting->recurrence_frequency.' · a cada '.($meeting->recurrence_interval ?? 1)) : 'Única' }}</dd></div>
                         <div class="sm:col-span-2"><dt class="text-xs uppercase text-gray-500">Objetivo</dt><dd class="mt-1 whitespace-pre-line text-sm text-gray-800">{{ $meeting->objective ?: '—' }}</dd></div>
+                        <div class="sm:col-span-2"><dt class="text-xs uppercase text-gray-500">Contexto</dt><dd class="mt-1 whitespace-pre-line text-sm text-gray-800">{{ $meeting->description ?: '—' }}</dd></div>
                         <div class="sm:col-span-2"><dt class="text-xs uppercase text-gray-500">Pauta</dt><dd class="mt-1 whitespace-pre-line text-sm text-gray-800">{{ $meeting->agenda ?: '—' }}</dd></div>
                         <div class="sm:col-span-2"><dt class="text-xs uppercase text-gray-500">Resultado esperado</dt><dd class="mt-1 whitespace-pre-line text-sm text-gray-800">{{ $meeting->expected_outcome ?: '—' }}</dd></div>
+                        <div class="sm:col-span-2"><dt class="text-xs uppercase text-gray-500">Observações adicionais</dt><dd class="mt-1 whitespace-pre-line text-sm text-gray-800">{{ $meeting->notes ?: '—' }}</dd></div>
                     </dl>
                 </div>
                 <div class="rounded-lg bg-white p-5 shadow-sm">
@@ -118,37 +120,94 @@
             <section class="rounded-lg bg-white p-5 shadow-sm">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <h3 class="font-semibold text-gray-900">Inteligência artificial</h3>
-                        <p class="mt-1 text-sm text-gray-600">A transcrição será enviada à OpenAI para gerar um resumo, decisões e encaminhamentos sugeridos. Revise o resultado antes de cadastrá-lo.</p>
+                        <h3 class="font-semibold text-gray-900">Insights gerados por Inteligência Artificial</h3>
+                        <p class="mt-1 text-sm text-gray-600">Registre manualmente as informações da reunião para receber uma análise contextual. Não há gravação nem transcrição automática. As sugestões não alteram decisões ou encaminhamentos.</p>
+                        <p class="mt-1 text-xs text-gray-500">Provedor configurado: {{ $aiProvider }} · Modelo: {{ $aiModel }}</p>
                     </div>
-                    @unless ($openAiConfigured)
-                        <p class="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">Configure OPENAI_API_KEY no servidor para habilitar a análise ChatGPT.</p>
+                    @unless ($aiConfigured)
+                        <p class="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">Configure a chave de API do provedor selecionado no servidor para gerar análises.</p>
                     @endunless
                 </div>
+
                 @can('meetings.edit')
-                    <form method="POST" action="{{ route('meetings.analyses.store', $meeting) }}" class="mt-4 space-y-3">
-                        @csrf
-                        <label class="block text-sm font-medium text-gray-700">Transcrição<textarea name="transcript" required minlength="20" maxlength="100000" rows="5" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" placeholder="Cole aqui a transcrição da reunião.">{{ old('transcript') }}</textarea></label>
-                        <button @disabled(! $openAiConfigured) class="rounded-md bg-teal-700 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white disabled:cursor-not-allowed disabled:opacity-50">Analisar transcrição</button>
-                    </form>
+                    @if (in_array($meeting->status, ['draft', 'scheduled'], true))
+                        <form method="POST" action="{{ route('meetings.analyses.store', $meeting) }}" class="mt-4 space-y-3 rounded-md border border-indigo-100 bg-indigo-50/40 p-4">
+                            @csrf
+                            <input type="hidden" name="analysis_type" value="pre_meeting">
+                            <label class="block text-sm font-medium text-gray-700">Contexto adicional para a nova análise (opcional)
+                                <textarea name="analysis_notes" maxlength="100000" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" placeholder="Acrescente informações novas antes de refazer a análise.">{{ old('analysis_type') === 'pre_meeting' ? old('analysis_notes') : '' }}</textarea>
+                            </label>
+                            <button @disabled(! $aiConfigured) class="rounded-md bg-indigo-700 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white disabled:cursor-not-allowed disabled:opacity-50">Refazer análise antes da reunião</button>
+                        </form>
+                    @elseif ($meeting->status === 'ongoing')
+                        <form method="POST" action="{{ route('meetings.analyses.store', $meeting) }}" class="mt-4 space-y-3 rounded-md border border-teal-100 bg-teal-50/40 p-4">
+                            @csrf
+                            <input type="hidden" name="analysis_type" value="during_meeting">
+                            <label class="block text-sm font-medium text-gray-700">Anotações desta etapa da reunião
+                                <textarea name="analysis_notes" required minlength="10" maxlength="100000" rows="5" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" placeholder="Registre assuntos discutidos, decisões tomadas e questões ainda sem resposta.">{{ old('analysis_type') === 'during_meeting' ? old('analysis_notes') : '' }}</textarea>
+                            </label>
+                            @error('analysis_notes')<span class="text-sm text-red-600">{{ $message }}</span>@enderror
+                            <button @disabled(! $aiConfigured) class="rounded-md bg-teal-700 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white disabled:cursor-not-allowed disabled:opacity-50">Gerar resumo parcial e alertas</button>
+                        </form>
+                    @elseif ($meeting->status === 'completed')
+                        <form method="POST" action="{{ route('meetings.analyses.store', $meeting) }}" class="mt-4 space-y-3 rounded-md border border-indigo-100 bg-indigo-50/40 p-4">
+                            @csrf
+                            <input type="hidden" name="analysis_type" value="post_meeting">
+                            <label class="block text-sm font-medium text-gray-700">Anotações e resultado da reunião
+                                <textarea name="analysis_notes" required minlength="10" maxlength="100000" rows="5" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" placeholder="Descreva o que ocorreu, o resultado e fatos relevantes para comparar com o objetivo.">{{ old('analysis_type') === 'post_meeting' ? old('analysis_notes') : '' }}</textarea>
+                            </label>
+                            @error('analysis_notes')<span class="text-sm text-red-600">{{ $message }}</span>@enderror
+                            <button @disabled(! $aiConfigured) class="rounded-md bg-indigo-700 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white disabled:cursor-not-allowed disabled:opacity-50">Analisar efetividade e próximos passos</button>
+                        </form>
+                    @endif
                 @endcan
+
                 <div class="mt-5 space-y-4">
                     @forelse ($meeting->analyses as $analysis)
-                        @if ($analysis->status === 'completed')
-                            <article class="rounded-md border border-gray-200 p-4">
-                                <p class="text-xs text-gray-500">Analisada por {{ $analysis->requester?->name ?? 'usuário removido' }} · {{ $analysis->completed_at?->format('d/m/Y H:i') }} · {{ $analysis->model }}</p>
-                                <h4 class="mt-3 text-sm font-semibold text-gray-900">Resumo</h4>
-                                <p class="mt-1 whitespace-pre-line text-sm text-gray-700">{{ $analysis->summary }}</p>
-                                <h4 class="mt-3 text-sm font-semibold text-gray-900">Decisões sugeridas</h4>
-                                <ul class="mt-1 list-inside list-disc text-sm text-gray-700">@forelse ($analysis->decisions ?? [] as $decision)<li>{{ $decision }}</li>@empty<li>Nenhuma decisão identificada.</li>@endforelse</ul>
-                                <h4 class="mt-3 text-sm font-semibold text-gray-900">Encaminhamentos sugeridos</h4>
-                                <ul class="mt-1 space-y-2 text-sm text-gray-700">@forelse ($analysis->action_items ?? [] as $item)<li><span class="font-medium">{{ $item['description'] }}</span> · Responsável: {{ $item['responsible_hint'] ?: 'não identificado' }} · Prazo: {{ $item['deadline_hint'] ?: 'não identificado' }} · Prioridade: {{ $item['priority'] }}</li>@empty<li>Nenhum encaminhamento identificado.</li>@endforelse</ul>
-                            </article>
-                        @elseif ($analysis->status === 'failed')
-                            <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">A análise de {{ $analysis->created_at?->format('d/m/Y H:i') }} não foi concluída.</p>
-                        @endif
+                        <article class="rounded-md border border-gray-200 p-4">
+                            <div class="flex flex-wrap justify-between gap-2">
+                                <h4 class="font-semibold text-gray-900">
+                                    {{ ['pre_meeting' => 'Antes', 'during_meeting' => 'Durante', 'post_meeting' => 'Depois'][$analysis->analysis_type] ?? 'Análise' }}
+                                    · versão {{ $analysis->prompt_version ? $analysis->version : 'histórica' }}
+                                </h4>
+                                <p class="text-xs text-gray-500">{{ $analysis->provider }} / {{ $analysis->model }} · {{ $analysis->completed_at?->format('d/m/Y H:i') ?? $analysis->created_at?->format('d/m/Y H:i') }} · Prompt {{ $analysis->prompt_version ?? 'legado' }}</p>
+                            </div>
+                            @if ($analysis->status === 'completed' && $analysis->result)
+                                @php($aiResult = $analysis->result)
+                                <p class="mt-3 text-sm font-medium text-gray-800">{{ $aiResult['summary'] }}</p>
+                                @foreach (['findings' => 'Constatações da IA', 'recommendations' => 'Recomendações da IA', 'risks' => 'Riscos', 'opportunities' => 'Oportunidades', 'missing_information' => 'Limitações e informações ausentes', 'historical_basis' => 'Base histórica', 'suggested_next_steps' => 'Próximos passos sugeridos'] as $key => $label)
+                                    @if (! empty($aiResult[$key]))
+                                        <div class="mt-3">
+                                            <h5 class="text-xs font-semibold uppercase tracking-wide text-gray-500">{{ $label }}</h5>
+                                            <ul class="mt-1 list-inside list-disc space-y-1 text-sm text-gray-700">
+                                                @foreach ($aiResult[$key] as $item)
+                                                    <li>@if (is_array($item))<strong>{{ $item['title'] }}</strong>: {{ $item['detail'] }} <span class="text-gray-500">{{ $item['justification'] }}</span>@else{{ $item }}@endif</li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    @endif
+                                @endforeach
+                                <p class="mt-3 text-xs text-gray-500">Confiança declarada pelo modelo: {{ number_format((float) $aiResult['confidence'] * 100, 0, ',', '.') }}%. Consumo reportado: {{ data_get($analysis->usage, 'total_tokens', 'não informado') }} tokens.</p>
+
+                                @can('view-costs')
+                                    @if ($analysis->provider_cost !== null)<p class="mt-1 text-xs text-gray-500">Custo de IA reportado pelo provedor: {{ number_format((float) $analysis->provider_cost, 6) }} (moeda informada pelo provedor).</p>@endif
+                                <details class="mt-3 text-xs text-gray-500"><summary class="cursor-pointer">Dados utilizados pela IA</summary><pre class="mt-2 whitespace-pre-wrap">{{ json_encode($analysis->input_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre></details>
+                                @else
+                                    <p class="mt-3 text-xs text-gray-500">Os dados completos usados pela IA estão ocultos pelas permissões atuais.</p>
+                                @endcan
+                            @elseif ($analysis->status === 'completed')
+                                <p class="mt-3 text-xs text-gray-500">Esta análise foi gerada antes do formato estruturado.</p>
+                                <p class="mt-2 whitespace-pre-line text-sm text-gray-700">{{ $analysis->summary }}</p>
+                                @if ($analysis->decisions)<ul class="mt-2 list-inside list-disc text-sm text-gray-700">@foreach ($analysis->decisions as $decision)<li>{{ $decision }}</li>@endforeach</ul>@endif
+                                @if ($analysis->action_items)<ul class="mt-2 space-y-1 text-sm text-gray-700">@foreach ($analysis->action_items as $action)<li>{{ $action['description'] ?? '' }} · Responsável: {{ $action['responsible_hint'] ?? 'não informado' }} · Prazo: {{ $action['deadline_hint'] ?? 'não informado' }}</li>@endforeach</ul>@endif
+                            @elseif ($analysis->status === 'failed')
+                                <p class="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{{ $analysis->error_message ?: 'A chamada ao provedor de IA não foi concluída.' }}</p>
+                            @else
+                                <p class="mt-3 text-sm text-gray-500">Análise ainda não concluída.</p>
+                            @endif
+                        </article>
                     @empty
-                        <p class="text-sm text-gray-500">Nenhuma análise registrada.</p>
+                        <p class="text-sm text-gray-500">Nenhuma análise de IA registrada nesta reunião.</p>
                     @endforelse
                 </div>
             </section>

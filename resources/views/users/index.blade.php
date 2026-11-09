@@ -45,7 +45,7 @@
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">E-mail</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Perfil organizacional</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Papel organizacional</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Superior responsável 1</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Superior responsável 2</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>

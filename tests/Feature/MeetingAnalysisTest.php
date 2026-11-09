@@ -7,17 +7,13 @@ use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
 
-it('stores a structured meeting analysis returned by the OpenAI API', function () {
-    config(['services.openai.api_key' => 'test-api-key']);
+it('stores a structured meeting analysis returned by the Gemini API', function () {
+    config(['services.gemini.api_key' => 'test-api-key']);
     Http::fake([
-        'api.openai.com/v1/responses' => Http::response([
-            'id' => 'resp_meeting_analysis_1',
-            'status' => 'completed',
-            'model' => 'gpt-6-luna',
-            'output' => [[
-                'type' => 'message',
-                'content' => [[
-                    'type' => 'output_text',
+        'generativelanguage.googleapis.com/v1beta/models/*:generateContent' => Http::response([
+            'modelVersion' => 'gemini-3.8-flash',
+            'candidates' => [[
+                'content' => ['parts' => [[
                     'text' => json_encode([
                         'summary' => 'A equipe aprovou o cronograma.',
                         'decisions' => ['Iniciar a implantação na próxima semana.'],
@@ -28,7 +24,7 @@ it('stores a structured meeting analysis returned by the OpenAI API', function (
                             'priority' => 'high',
                         ]],
                     ], JSON_THROW_ON_ERROR),
-                ]],
+                ]]],
             ]],
         ]),
     ]);
@@ -55,12 +51,13 @@ it('stores a structured meeting analysis returned by the OpenAI API', function (
         ->and($analysis->summary)->toBe('A equipe aprovou o cronograma.')
         ->and($analysis->decisions)->toBe(['Iniciar a implantação na próxima semana.'])
         ->and($analysis->action_items[0]['responsible_hint'])->toBe('Ana')
-        ->and($analysis->response_id)->toBe('resp_meeting_analysis_1');
+        ->and($analysis->provider)->toBe('gemini')
+        ->and($analysis->model)->toBe('gemini-3.8-flash');
 
-    Http::assertSent(fn ($request): bool => $request->url() === 'https://api.openai.com/v1/responses'
-        && $request->hasHeader('Authorization', 'Bearer test-api-key')
-        && $request['store'] === false
-        && $request['text']['format']['type'] === 'json_schema');
+    Http::assertSent(fn ($request): bool => $request->url() === 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent'
+        && $request->hasHeader('x-goog-api-key', 'test-api-key')
+        && $request['generationConfig']['responseMimeType'] === 'application/json'
+        && $request['generationConfig']['responseSchema']['type'] === 'OBJECT');
 });
 
 it('requires an API key and edit access before creating an analysis', function () {
@@ -74,7 +71,7 @@ it('requires an API key and edit access before creating an analysis', function (
         'status' => 'scheduled',
     ]);
 
-    config(['services.openai.api_key' => null]);
+    config(['services.gemini.api_key' => null]);
     $this->actingAs($owner)->post(route('meetings.analyses.store', $meeting), [
         'transcript' => 'Esta transcrição possui conteúdo suficiente para validar a solicitação.',
     ])->assertSessionHasErrors('transcript');
@@ -88,8 +85,8 @@ it('requires an API key and edit access before creating an analysis', function (
 });
 
 it('preserves a failed analysis without exposing provider errors to the user', function () {
-    config(['services.openai.api_key' => 'test-api-key']);
-    Http::fake(['api.openai.com/v1/responses' => Http::response(['error' => ['message' => 'provider details']], 503)]);
+    config(['services.gemini.api_key' => 'test-api-key']);
+    Http::fake(['generativelanguage.googleapis.com/*' => Http::response(['error' => ['message' => 'provider details']], 503)]);
 
     $owner = createUserWithPermissions(['meetings.view', 'meetings.edit']);
     $meeting = Meeting::create([

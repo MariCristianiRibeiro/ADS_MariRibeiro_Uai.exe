@@ -13,13 +13,13 @@ class MeetingAnalysis extends Model
     use HasFactory;
 
     protected $fillable = [
-        'meeting_id', 'requested_by', 'transcript', 'summary', 'decisions', 'action_items',
-        'provider', 'model', 'response_id', 'status', 'error_message', 'completed_at',
+        'meeting_id', 'requested_by', 'analysis_type', 'version', 'prompt_version', 'input_data', 'result', 'usage', 'provider_cost',
+        'transcript', 'summary', 'decisions', 'action_items', 'provider', 'model', 'response_id', 'status', 'error_message', 'completed_at',
     ];
 
     protected function casts(): array
     {
-        return ['decisions' => 'array', 'action_items' => 'array', 'completed_at' => 'datetime'];
+        return ['input_data' => 'array', 'result' => 'array', 'usage' => 'array', 'decisions' => 'array', 'action_items' => 'array', 'completed_at' => 'datetime'];
     }
 
     public function meeting(): BelongsTo

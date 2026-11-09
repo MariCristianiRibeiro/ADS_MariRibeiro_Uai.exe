@@ -27,7 +27,7 @@
     }"
     x-init="notify()"
 >
-    <label for="participant_search" class="block text-sm font-medium text-gray-700">Participantes</label>
+    <label for="participant_search" class="block text-sm font-medium text-gray-700">Participantes <x-info-tip text="Convide somente quem precisa contribuir diretamente, decidir ou executar um encaminhamento. O custo previsto é calculado com o valor-hora do cadastro." /></label>
     <input id="participant_search" type="search" x-model="search" autocomplete="off" placeholder="Pesquisar por nome ou função" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
 
     <div x-show="search.trim().length > 0" x-cloak class="mt-1 max-h-48 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-sm">
@@ -52,7 +52,7 @@
                     <button type="button" @click="remove(option.id)" class="text-sm font-medium text-red-600 hover:text-red-800">Remover</button>
                 </div>
                 <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <label class="block text-xs font-medium text-gray-600">Papel na reunião
+                    <label class="block text-xs font-medium text-gray-600">Papel na reunião <x-info-tip text="Indique a contribuição esperada: organizar, participar, decidir ou contribuir como convidado." />
                         <select :name="'participant_roles[' + option.id + ']'" x-model="option.meetingRole" class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm">
                             <option value="organizer">Organizador</option><option value="participant">Participante</option><option value="decision_responsible">Responsável por decisão</option><option value="guest">Convidado</option>
                         </select>

@@ -26,7 +26,7 @@
                         </div>
 
                         <div>
-                            <label for="role" class="block text-sm font-medium text-gray-700">Perfil organizacional</label>
+                            <label for="role" class="block text-sm font-medium text-gray-700">Papel organizacional <x-info-tip text="Indica o papel na hierarquia e pode influenciar escopos e relatórios. As permissões são definidas separadamente em Perfis de acesso." /></label>
                             <select id="role" name="role" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 <option value="participant" {{ old('role', $user->role ?? 'participant') === 'participant' ? 'selected' : '' }}>Participante / Organizador</option>
                                 <option value="admin" {{ old('role', $user->role ?? 'participant') === 'admin' ? 'selected' : '' }}>Administrador</option>
@@ -59,7 +59,7 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6"><div><label for="directorate_id" class="block text-sm font-medium text-gray-700">Diretoria</label><select id="directorate_id" name="directorate_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"><option value="">Não atribuída</option>@foreach ($directorates as $directorate)<option value="{{ $directorate->id }}" {{ old('directorate_id', $user->directorate_id) == $directorate->id ? 'selected' : '' }}>{{ $directorate->name }}</option>@endforeach</select></div><div><label for="team_id" class="block text-sm font-medium text-gray-700">Equipe</label><select id="team_id" name="team_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"><option value="">Não atribuída</option>@foreach ($teams as $team)<option value="{{ $team->id }}" {{ old('team_id', $user->team_id) == $team->id ? 'selected' : '' }}>{{ $team->name }}</option>@endforeach</select></div></div>
 
                         <div>
-                            <label for="job_position_id" class="block text-sm font-medium text-gray-700">Cargo</label>
+                            <label for="job_position_id" class="block text-sm font-medium text-gray-700">Cargo <x-info-tip text="Função profissional cadastrada. O valor-hora do cargo é a referência principal para estimar custos de reuniões." /></label>
                             <select id="job_position_id" name="job_position_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
                                 <option value="">Não atribuído</option>
                                 @foreach ($jobPositions as $jobPosition)

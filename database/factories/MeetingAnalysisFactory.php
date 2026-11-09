@@ -26,8 +26,8 @@ class MeetingAnalysisFactory extends Factory
             'summary' => fake()->paragraph(),
             'decisions' => [fake()->sentence()],
             'action_items' => [],
-            'provider' => 'openai',
-            'model' => 'gpt-6-luna',
+            'provider' => 'gemini',
+            'model' => 'gemini-3.8-flash',
             'status' => 'completed',
             'completed_at' => now(),
         ];

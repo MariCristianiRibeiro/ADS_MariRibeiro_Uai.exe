@@ -5,16 +5,21 @@ namespace App\Http\Controllers;
 use App\Models\Directorate;
 use App\Models\Meeting;
 use App\Models\MeetingActionItem;
+use App\Models\MeetingAnalysis;
 use App\Models\Participant;
 use App\Models\Project;
 use App\Models\User;
-use App\Services\MeetingTranscriptAnalyzer;
+use App\Services\MeetingAiService;
+use App\Services\MeetingCostCalculator;
+use App\Services\MeetingPreflightAnalyzer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -141,19 +146,32 @@ class MeetingController extends Controller
         ]);
     }
 
-    public function create(): View
+    public function create(MeetingCostCalculator $costCalculator): View
     {
         abort_unless(Auth::user()->hasPermission('meetings.create'), 403);
 
+        $members = $this->availableMembers();
+
         return view('meetings.create', [
             'projects' => Project::query()->where('status', 'active')->orderBy('name')->get(),
-            'members' => $this->availableMembers(),
+            'members' => $members,
+            'hourlyRates' => $members->mapWithKeys(fn (User $member): array => [$member->id => $costCalculator->userRate($member)])->all(),
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, MeetingCostCalculator $costCalculator): RedirectResponse
     {
         abort_unless($request->user()->hasPermission('meetings.create'), 403);
+
+        $token = $request->validate(['preflight_token' => ['required', 'uuid']])['preflight_token'];
+        $preflight = Cache::pull($this->preflightCacheKey($request->user()->id, $token));
+        if (! is_array($preflight) || ! isset($preflight['meeting_data'], $preflight['analysis'])) {
+            return redirect()->route('meetings.create')->withErrors([
+                'preflight_token' => 'A prévia expirou. Analise o investimento novamente antes de confirmar.',
+            ]);
+        }
+
+        $request->replace($preflight['meeting_data']);
 
         $request->merge([
             'duration_minutes' => $request->input('duration_minutes', 60),
@@ -165,15 +183,32 @@ class MeetingController extends Controller
         $validated = $this->validateMeeting($request);
         $requestedIds = collect($validated['participants'] ?? []);
         $participantUserIds = $this->resolveParticipantUserIds($requestedIds);
+        $previewParticipants = collect($preflight['analysis']['participants'])->keyBy('id');
+        $currentParticipants = User::with(['jobPosition', 'team', 'directorate', 'participantProfile'])->whereKey($participantUserIds)->get();
+        $participantContextChanged = $currentParticipants->contains(function (User $participant) use ($previewParticipants, $costCalculator): bool {
+            $preview = $previewParticipants->get($participant->id);
+            $department = $participant->directorate?->name ?? $participant->team?->name ?? 'Sem departamento';
+
+            return ! is_array($preview)
+                || round((float) $preview['hourly_rate'], 2) !== round($costCalculator->userRate($participant), 2)
+                || $preview['position'] !== ($participant->jobPosition?->name ?? 'Cargo não informado')
+                || $preview['department'] !== $department;
+        });
+        if ($participantContextChanged) {
+            return redirect()->route('meetings.create')->withErrors([
+                'preflight_token' => 'Os dados de cargo, departamento ou valor-hora mudaram desde a prévia. Revise e analise novamente.',
+            ])->withInput($preflight['meeting_data']);
+        }
         $attendance = $validated['attendance'] ?? [];
         $roles = $validated['participant_roles'] ?? [];
         $invitations = $validated['invitations'] ?? [];
         $confirmations = $validated['confirmations'] ?? [];
         unset($validated['attendance'], $validated['participants'], $validated['participant_roles'], $validated['invitations'], $validated['confirmations']);
 
-        $meeting = DB::transaction(function () use ($validated, $requestedIds, $participantUserIds, $attendance, $roles, $invitations, $confirmations): Meeting {
+        $meeting = DB::transaction(function () use ($validated, $requestedIds, $participantUserIds, $attendance, $roles, $invitations, $confirmations, $costCalculator, $preflight, $request): Meeting {
             $meeting = Meeting::create([...$validated, 'user_id' => Auth::id()]);
-            $this->syncParticipants($meeting, $requestedIds, $participantUserIds, $attendance, $roles, $invitations, $confirmations);
+            $this->syncParticipants($meeting, $requestedIds, $participantUserIds, $attendance, $roles, $invitations, $confirmations, $costCalculator);
+            $this->storeAiAnalysis($meeting, $request->user()->id, 'pre_meeting', $preflight['analysis']);
 
             return $meeting;
         });
@@ -181,7 +216,44 @@ class MeetingController extends Controller
         return redirect()->route('meetings.index')->with('success', 'Reunião cadastrada com sucesso.');
     }
 
-    public function show(Meeting $meeting, Request $request): View
+    public function preview(Request $request, MeetingPreflightAnalyzer $analyzer): View
+    {
+        abort_unless($request->user()->hasPermission('meetings.create'), 403);
+
+        $request->merge([
+            'duration_minutes' => $request->input('duration_minutes', 60),
+            'organizer_id' => $request->input('organizer_id', Auth::id()),
+            'priority' => $request->input('priority', 'normal'),
+            'recurrence_type' => $request->input('recurrence_type', 'single'),
+        ]);
+        $validated = $this->validateMeeting($request);
+        $userIds = $this->resolveParticipantUserIds(collect($validated['participants'] ?? []));
+        $participants = User::with(['jobPosition', 'team', 'directorate', 'participantProfile'])
+            ->whereKey($userIds)->get();
+
+        $analysis = $analyzer->analyze($validated, $participants);
+        $preflightToken = (string) Str::uuid();
+        Cache::put($this->preflightCacheKey($request->user()->id, $preflightToken), [
+            'meeting_data' => $validated,
+            'analysis' => $analysis,
+        ], now()->addMinutes(30));
+
+        return view('meetings.preview', [
+            'meetingData' => $validated,
+            'analysis' => $analysis,
+            'preflightToken' => $preflightToken,
+            'canViewCosts' => $request->user()->canViewCosts(),
+        ]);
+    }
+
+    public function adjust(Request $request): RedirectResponse
+    {
+        abort_unless($request->user()->hasPermission('meetings.create'), 403);
+
+        return redirect()->route('meetings.create')->withInput($request->except('_token'));
+    }
+
+    public function show(Meeting $meeting, Request $request, MeetingAiService $aiService): View
     {
         abort_unless($request->user()->hasPermission('meetings.view'), 403);
         abort_unless($meeting->user_id === $request->user()->id, 403);
@@ -208,65 +280,87 @@ class MeetingController extends Controller
             'meeting' => $meeting,
             'members' => $meeting->users()->orderBy('name')->get(),
             'directorates' => Directorate::query()->where('active', true)->orderBy('name')->get(),
-            'openAiConfigured' => filled(config('services.openai.api_key')),
+            'aiConfigured' => $aiService->isConfigured(),
+            'aiProvider' => $aiService->provider(),
+            'aiModel' => $aiService->configuredModel(),
         ]);
     }
 
-    public function analyzeTranscript(Request $request, Meeting $meeting, MeetingTranscriptAnalyzer $analyzer): RedirectResponse
+    public function analyzeMeetingContext(Request $request, Meeting $meeting, MeetingAiService $aiService): RedirectResponse
     {
         $this->assertCanManageMeeting($request, $meeting);
-
+        $notesRules = $request->input('analysis_type') === 'pre_meeting'
+            ? ['nullable', 'string', 'max:100000']
+            : ['required', 'string', 'min:10', 'max:100000'];
         $validated = $request->validate([
-            'transcript' => ['required', 'string', 'min:20', 'max:100000'],
+            'analysis_type' => ['required', Rule::in(['pre_meeting', 'during_meeting', 'post_meeting'])],
+            'analysis_notes' => $notesRules,
         ]);
 
-        if (blank(config('services.openai.api_key'))) {
-            return back()->withErrors([
-                'transcript' => 'A integração ChatGPT ainda não está configurada. Defina OPENAI_API_KEY no servidor.',
-            ])->withInput();
+        $stage = $validated['analysis_type'];
+        if (($stage === 'pre_meeting' && ! in_array($meeting->status, ['draft', 'scheduled'], true))
+            || ($stage === 'during_meeting' && $meeting->status !== 'ongoing')
+            || ($stage === 'post_meeting' && $meeting->status !== 'completed')) {
+            return back()->withErrors(['analysis_notes' => 'A etapa de análise não corresponde ao status atual da reunião.'])->withInput();
+        }
+        if ($stage !== 'pre_meeting' && blank($validated['analysis_notes'] ?? null)) {
+            return back()->withErrors(['analysis_notes' => 'Registre as informações da reunião antes de pedir a análise.'])->withInput();
         }
 
+        $meeting->loadMissing(['meetingParticipants.user.jobPosition', 'meetingParticipants.costSnapshot', 'decisions', 'actionItems.responsible', 'conclusion']);
+        $inputData = $this->buildMeetingAnalysisContext($meeting, $stage, (string) ($validated['analysis_notes'] ?? ''));
+        $version = (int) $meeting->analyses()->where('analysis_type', $stage)->max('version') + 1;
         $analysis = $meeting->analyses()->create([
             'requested_by' => $request->user()->id,
-            'transcript' => $validated['transcript'],
-            'provider' => 'openai',
-            'model' => config('services.openai.model'),
+            'analysis_type' => $stage,
+            'version' => $version,
+            'prompt_version' => 'meeting-insights-v1',
+            'transcript' => $validated['analysis_notes'] ?? '',
+            'input_data' => $inputData,
+            'provider' => config('services.ai.provider', 'gemini'),
+            'model' => $aiService->configuredModel(),
             'status' => 'processing',
         ]);
 
         try {
-            $result = $analyzer->analyze($validated['transcript']);
-            $analysis->update([...$result, 'status' => 'completed', 'completed_at' => now()]);
+            $this->updateAnalysisFromAi($analysis, $aiService->analyze($stage, $inputData));
         } catch (\Throwable $exception) {
             $analysis->update([
                 'status' => 'failed',
-                'error_message' => $exception->getMessage(),
+                'error_message' => 'A chamada de IA falhou. Verifique conexão, provedor e chave de API.',
             ]);
 
-            return back()->withErrors([
-                'transcript' => 'Não foi possível concluir a análise agora. Tente novamente mais tarde.',
-            ])->withInput();
+            return back()->withErrors(['analysis_notes' => $exception->getMessage()])->withInput();
         }
 
-        return back()->with('success', 'Transcrição analisada pelo ChatGPT. Revise as sugestões antes de cadastrá-las.');
+        return back()->with('success', 'Análise gerada pela IA. Revise as sugestões; nada foi salvo como decisão ou encaminhamento.');
     }
 
-    public function edit(Meeting $meeting): View
+    public function analyzeTranscript(Request $request, Meeting $meeting, MeetingAiService $aiService): RedirectResponse
+    {
+        return $this->analyzeMeetingContext($request, $meeting, $aiService);
+    }
+
+    public function edit(Meeting $meeting, MeetingCostCalculator $costCalculator): View
     {
         abort_unless(Auth::user()->hasPermission('meetings.edit'), 403);
 
         abort_unless($meeting->user_id === Auth::id(), 403);
 
-        $meeting->load(['users', 'meetingParticipants.costSnapshot']);
+        $meeting->load(['users.jobPosition', 'users.participantProfile', 'meetingParticipants.costSnapshot']);
+        $members = $this->availableMembers();
 
         return view('meetings.edit', [
             'meeting' => $meeting,
             'projects' => Project::query()->where('status', 'active')->orderBy('name')->get(),
-            'members' => $this->availableMembers(),
+            'members' => $members,
+            'hourlyRates' => $members->mapWithKeys(fn (User $member): array => [
+                $member->id => $costCalculator->meetingParticipantRate($meeting, $member),
+            ])->all(),
         ]);
     }
 
-    public function update(Request $request, Meeting $meeting): RedirectResponse
+    public function update(Request $request, Meeting $meeting, MeetingCostCalculator $costCalculator): RedirectResponse
     {
         abort_unless($request->user()->hasPermission('meetings.edit'), 403);
 
@@ -275,7 +369,6 @@ class MeetingController extends Controller
         $request->merge([
             'duration_minutes' => $request->input('duration_minutes', $meeting->duration_minutes ?: 60),
             'organizer_id' => $request->input('organizer_id', $meeting->organizer_id ?? Auth::id()),
-            'actual_duration_seconds' => $request->input('actual_duration_seconds', $meeting->actual_duration_seconds),
             'priority' => $request->input('priority', $meeting->priority ?? 'normal'),
             'recurrence_type' => $request->input('recurrence_type', $meeting->recurrence_type ?? 'single'),
         ]);
@@ -289,9 +382,9 @@ class MeetingController extends Controller
         $confirmations = $validated['confirmations'] ?? [];
         unset($validated['attendance'], $validated['participants'], $validated['participant_roles'], $validated['invitations'], $validated['confirmations']);
 
-        DB::transaction(function () use ($meeting, $validated, $requestedIds, $participantUserIds, $attendance, $roles, $invitations, $confirmations): void {
+        DB::transaction(function () use ($meeting, $validated, $requestedIds, $participantUserIds, $attendance, $roles, $invitations, $confirmations, $costCalculator): void {
             $meeting->update($validated);
-            $this->syncParticipants($meeting, $requestedIds, $participantUserIds, $attendance, $roles, $invitations, $confirmations);
+            $this->syncParticipants($meeting, $requestedIds, $participantUserIds, $attendance, $roles, $invitations, $confirmations, $costCalculator);
         });
 
         return redirect()->route('meetings.index')->with('success', 'Reunião atualizada com sucesso.');
@@ -405,6 +498,172 @@ class MeetingController extends Controller
         return back()->with('success', 'Conclusão registrada.');
     }
 
+    /** @param array<string, mixed> $preflight
+     */
+    private function storeAiAnalysis(Meeting $meeting, int $userId, string $stage, array $preflight): void
+    {
+        $metadata = $preflight['ai_metadata'] ?? [];
+        $result = $preflight['ai_result'] ?? null;
+        $version = (int) $meeting->analyses()->where('analysis_type', $stage)->max('version') + 1;
+        $meeting->analyses()->create([
+            'requested_by' => $userId,
+            'analysis_type' => $stage,
+            'version' => $version,
+            'prompt_version' => $metadata['prompt_version'] ?? 'meeting-insights-v1',
+            'transcript' => '',
+            'input_data' => $preflight['ai_input_data'] ?? [],
+            'result' => $result,
+            'summary' => $result['summary'] ?? null,
+            'decisions' => $result['findings'] ?? null,
+            'action_items' => collect($result['recommendations'] ?? [])->map(fn (array $recommendation): array => [
+                'description' => trim(($recommendation['title'] ?? '').': '.($recommendation['detail'] ?? '')),
+                'responsible_hint' => 'Não informado',
+                'deadline_hint' => 'Não informado',
+                'priority' => 'normal',
+            ])->values()->all(),
+            'provider' => $metadata['provider'] ?? config('services.ai.provider', 'gemini'),
+            'model' => $metadata['model'] ?? app(MeetingAiService::class)->configuredModel(),
+            'response_id' => $metadata['response_id'] ?? null,
+            'usage' => $metadata['usage'] ?? null,
+            'provider_cost' => is_numeric(data_get($metadata, 'usage.cost')) ? data_get($metadata, 'usage.cost') : null,
+            'status' => $result === null ? 'failed' : 'completed',
+            'error_message' => $preflight['ai_error'] ?? null,
+            'completed_at' => $result === null ? null : now(),
+        ]);
+    }
+
+    /** @param array<string, mixed> $aiResponse
+     */
+    private function updateAnalysisFromAi(MeetingAnalysis $analysis, array $aiResponse): void
+    {
+        $result = $aiResponse['result'];
+        $analysis->update([
+            'result' => $result,
+            'summary' => $result['summary'],
+            'decisions' => $result['findings'],
+            'action_items' => collect($result['recommendations'])->map(fn (array $recommendation): array => [
+                'description' => trim($recommendation['title'].': '.$recommendation['detail']),
+                'responsible_hint' => 'Não informado',
+                'deadline_hint' => 'Não informado',
+                'priority' => 'normal',
+            ])->values()->all(),
+            'provider' => $aiResponse['provider'],
+            'model' => $aiResponse['model'],
+            'response_id' => $aiResponse['response_id'],
+            'prompt_version' => $aiResponse['prompt_version'],
+            'usage' => $aiResponse['usage'],
+            'provider_cost' => is_numeric(data_get($aiResponse, 'usage.cost')) ? data_get($aiResponse, 'usage.cost') : null,
+            'status' => 'completed',
+            'completed_at' => now(),
+        ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function buildMeetingAnalysisContext(Meeting $meeting, string $stage, string $notes): array
+    {
+        $participants = $meeting->meetingParticipants->map(fn ($participant): array => [
+            'cargo' => $participant->user?->jobPosition?->name ?? 'Não informado',
+            'papel' => $participant->role,
+            'presenca' => $participant->attendance_status,
+            'participante_efetivo' => $participant->attendance_status === 'confirmed',
+        ]);
+        $decisions = $meeting->decisions->map(fn ($decision): array => [
+            'titulo' => $decision->title,
+            'descricao' => $decision->description,
+            'responsavel_registrado' => $decision->decided_by !== null,
+            'data' => $decision->decided_at?->toIso8601String(),
+        ]);
+        $actions = $meeting->actionItems->map(fn ($item): array => [
+            'titulo' => $item->title,
+            'descricao' => $item->description,
+            'status' => $item->status,
+            'prazo' => $item->due_date?->toDateString(),
+            'responsavel_atribuido' => $item->responsible_user_id !== null,
+            'resultado_entregue' => $item->delivered_result,
+        ]);
+        $elapsedSeconds = (int) ($meeting->actual_duration_seconds ?? 0);
+        if ($meeting->timer_started_at !== null) {
+            $elapsedSeconds += max(0, now()->diffInSeconds($meeting->timer_started_at, absolute: true));
+        }
+
+        $terms = collect(preg_split('/\s+/u', Str::lower($meeting->title)) ?: [])
+            ->filter(fn (string $term): bool => mb_strlen($term) >= 4)->unique()->take(5);
+        $historicalMeetings = Meeting::query()->where('user_id', $meeting->user_id)
+            ->where('id', '<>', $meeting->id)->where('status', 'completed')
+            ->when($terms->isNotEmpty(), function ($query) use ($terms): void {
+                $query->where(function ($builder) use ($terms): void {
+                    foreach ($terms as $term) {
+                        $builder->orWhere('title', 'like', "%{$term}%")
+                            ->orWhere('objective', 'like', "%{$term}%");
+                    }
+                });
+            })
+            ->with(['conclusion', 'actionItems'])->latest('date')->limit(5)->get()
+            ->map(fn (Meeting $past): array => [
+                'titulo' => $past->title,
+                'objetivo' => $past->objective,
+                'resultado' => $past->conclusion?->outcome ?? $past->conclusion?->summary,
+                'duracao_real_segundos' => $past->actual_duration_seconds,
+                'encaminhamentos_concluidos' => $past->actionItems->where('status', 'completed')->count(),
+                'encaminhamentos_total' => $past->actionItems->count(),
+            ]);
+        $financialMetrics = [];
+        if ($stage === 'pre_meeting' && Auth::user()?->canViewCosts()) {
+            $estimatedCost = app(MeetingCostCalculator::class)->estimatedTotal($meeting);
+            $financialMetrics = [
+                'custo_estimado_backend' => $estimatedCost,
+                'horas_colaborador' => $participants->count() * ((int) $meeting->duration_minutes / 60),
+                'duracao_reuniao_horas' => (int) $meeting->duration_minutes / 60,
+            ];
+        }
+        $weekStart = $meeting->date?->copy()->startOfWeek()->toDateString();
+        $weekEnd = $meeting->date?->copy()->endOfWeek()->toDateString();
+        $weeklyAgenda = Meeting::query()->where('user_id', $meeting->user_id)
+            ->whereIn('status', ['scheduled', 'ongoing'])
+            ->whereBetween('date', [$weekStart, $weekEnd])
+            ->whereHas('users', fn ($query) => $query->whereIn('users.id', $meeting->meetingParticipants->pluck('user_id')))
+            ->get(['id', 'duration_minutes']);
+
+        return [
+            'etapa' => $stage,
+            'reuniao' => [
+                'titulo' => $meeting->title,
+                'categoria' => $meeting->category,
+                'objetivo' => $meeting->objective,
+                'contexto' => $meeting->description,
+                'pauta' => $meeting->agenda,
+                'resultado_esperado' => $meeting->expected_outcome,
+                'data' => $meeting->date?->toDateString(),
+                'duracao_prevista_minutos' => $meeting->duration_minutes,
+                'duracao_real_segundos' => $elapsedSeconds,
+                'recorrencia' => [$meeting->recurrence_type, $meeting->recurrence_frequency, $meeting->recurrence_interval],
+            ],
+            'participantes' => $participants->values(),
+            'anotacoes_manuais_desta_execucao' => $notes,
+            'decisoes_registradas' => $decisions->values(),
+            'encaminhamentos_registrados' => $actions->values(),
+            'assuntos_pendentes' => $actions->whereNotIn('status', ['completed', 'canceled'])->values(),
+            'indicadores_financeiros_calculados_pelo_sistema' => $financialMetrics,
+            'impacto_agenda_semanal' => [
+                'reunioes_com_participantes' => $weeklyAgenda->count(),
+                'horas_agendadas' => (float) $weeklyAgenda->sum('duration_minutes') / 60,
+            ],
+            'resultado_informado' => [
+                'resumo' => $meeting->conclusion?->summary,
+                'resultado' => $meeting->conclusion?->outcome,
+            ],
+            'avaliacoes_dos_participantes' => null,
+            'historico_relacionado_acessivel' => $historicalMeetings->values(),
+            'historico_suficiente_para_estimativa' => $historicalMeetings->count() >= 3,
+            'observacao' => 'Nomes pessoais e conteúdo de outras reuniões fora do escopo acessível não são enviados. Sugestões exigem revisão humana.',
+        ];
+    }
+
+    private function preflightCacheKey(int $userId, string $token): string
+    {
+        return "meeting-preflight:{$userId}:{$token}";
+    }
+
     private function assertCanManageMeeting(Request $request, Meeting $meeting): void
     {
         abort_unless($request->user()->hasPermission('meetings.edit'), 403);
@@ -419,6 +678,7 @@ class MeetingController extends Controller
         array $roles,
         array $invitations,
         array $confirmations,
+        MeetingCostCalculator $costCalculator,
     ): void {
         $pivot = collect($userIds)->mapWithKeys(fn (int $userId): array => [$userId => [
             'role' => $roles[$userId] ?? ($userId === (int) $meeting->organizer_id ? 'organizer' : 'participant'),
@@ -440,7 +700,7 @@ class MeetingController extends Controller
         ])->all());
 
         $meeting->meetingParticipants()->with('user.jobPosition', 'user.team', 'user.directorate', 'user.participantProfile', 'costSnapshot')
-            ->get()->each(function ($participant): void {
+            ->get()->each(function ($participant) use ($costCalculator): void {
                 if ($participant->costSnapshot !== null) {
                     return;
                 }
@@ -449,10 +709,7 @@ class MeetingController extends Controller
                     'job_position_id' => $participant->user?->job_position_id,
                     'team_id' => $participant->user?->team_id,
                     'directorate_id' => $participant->user?->directorate_id,
-                    'hourly_rate' => $participant->user?->jobPosition?->hourly_rate
-                        ?? $participant->user?->hourly_rate
-                        ?? $participant->user?->participantProfile?->hourly_rate
-                        ?? 0,
+                    'hourly_rate' => $participant->user ? $costCalculator->userRate($participant->user) : 0,
                     'captured_at' => now(),
                 ]);
             });
@@ -484,7 +741,6 @@ class MeetingController extends Controller
             'time' => ['nullable', 'date_format:H:i'],
             'end_time' => ['nullable', 'date_format:H:i', 'after:time'],
             'duration_minutes' => ['required', 'integer', 'min:1', 'max:1440'],
-            'actual_duration_seconds' => ['nullable', 'integer', 'min:0'],
             'location' => ['nullable', 'string', 'max:255'],
             'meeting_format' => ['nullable', Rule::in(['in_person', 'virtual', 'hybrid'])],
             'agenda' => ['nullable', 'string'],

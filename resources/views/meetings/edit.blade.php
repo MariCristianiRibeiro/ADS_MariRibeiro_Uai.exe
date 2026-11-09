@@ -11,7 +11,7 @@
                     <div class="space-y-6">
                         @include('meetings._meeting-fields')
                         @include('meetings._participant-picker', ['selectedMemberIds' => $selectedMemberIds])
-                        @include('meetings._timer', ['selectedParticipantIds' => $selectedMemberIds])
+                        @include('meetings._meeting-investment', ['selectedParticipantIds' => $selectedMemberIds])
                     </div>
                     <div class="mt-6 flex justify-end gap-3">
                         <a href="{{ route('meetings.show', $meeting) }}" class="rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-widest text-gray-700 shadow-sm">Voltar</a>
