@@ -162,6 +162,16 @@ class Meeting extends Model
         return $this->hasMany(MeetingAnalysis::class)->latest();
     }
 
+    public function predictions(): HasMany
+    {
+        return $this->hasMany(MeetingPrediction::class)->latest('predicted_at');
+    }
+
+    public function recommendationFeedback(): HasMany
+    {
+        return $this->hasMany(MeetingRecommendationFeedback::class)->latest();
+    }
+
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);

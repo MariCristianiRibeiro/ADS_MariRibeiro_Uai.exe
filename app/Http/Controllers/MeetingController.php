@@ -11,6 +11,7 @@ use App\Models\Project;
 use App\Models\User;
 use App\Services\MeetingAiService;
 use App\Services\MeetingCostCalculator;
+use App\Services\MeetingPredictionService;
 use App\Services\MeetingPreflightAnalyzer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -106,7 +107,7 @@ class MeetingController extends Controller
         ]);
     }
 
-    public function finish(Meeting $meeting): JsonResponse
+    public function finish(Meeting $meeting, MeetingPredictionService $predictions): JsonResponse
     {
         abort_unless(Auth::user()->hasPermission('meetings.finish'), 403);
         abort_unless($meeting->user_id === Auth::id(), 403);
@@ -138,6 +139,7 @@ class MeetingController extends Controller
 
             return $meeting;
         });
+        $predictions->evaluatePending($meeting->id);
 
         return response()->json([
             'actualDurationSeconds' => $meeting->actual_duration_seconds ?? 0,
@@ -159,7 +161,7 @@ class MeetingController extends Controller
         ]);
     }
 
-    public function store(Request $request, MeetingCostCalculator $costCalculator): RedirectResponse
+    public function store(Request $request, MeetingCostCalculator $costCalculator, MeetingPredictionService $predictions): RedirectResponse
     {
         abort_unless($request->user()->hasPermission('meetings.create'), 403);
 
@@ -205,10 +207,11 @@ class MeetingController extends Controller
         $confirmations = $validated['confirmations'] ?? [];
         unset($validated['attendance'], $validated['participants'], $validated['participant_roles'], $validated['invitations'], $validated['confirmations']);
 
-        $meeting = DB::transaction(function () use ($validated, $requestedIds, $participantUserIds, $attendance, $roles, $invitations, $confirmations, $costCalculator, $preflight, $request): Meeting {
+        $meeting = DB::transaction(function () use ($validated, $requestedIds, $participantUserIds, $attendance, $roles, $invitations, $confirmations, $costCalculator, $preflight, $request, $predictions): Meeting {
             $meeting = Meeting::create([...$validated, 'user_id' => Auth::id()]);
             $this->syncParticipants($meeting, $requestedIds, $participantUserIds, $attendance, $roles, $invitations, $confirmations, $costCalculator);
             $this->storeAiAnalysis($meeting, $request->user()->id, 'pre_meeting', $preflight['analysis']);
+            $predictions->generateFor($meeting, $request->user());
 
             return $meeting;
         });
@@ -253,10 +256,12 @@ class MeetingController extends Controller
         return redirect()->route('meetings.create')->withInput($request->except('_token'));
     }
 
-    public function show(Meeting $meeting, Request $request, MeetingAiService $aiService): View
+    public function show(Meeting $meeting, Request $request, MeetingAiService $aiService, MeetingPredictionService $predictions): View
     {
         abort_unless($request->user()->hasPermission('meetings.view'), 403);
         abort_unless($meeting->user_id === $request->user()->id || $meeting->meetingParticipants()->where('user_id', $request->user()->id)->exists(), 403);
+
+        $predictions->generateFor($meeting, $request->user());
 
         $meeting->load([
             'project',
@@ -277,6 +282,8 @@ class MeetingController extends Controller
             'participantFeedback.user',
             'meetingParticipants.user',
             'actionItems.history.actor',
+            'predictions.evaluations',
+            'recommendationFeedback',
         ]);
         $learningMeetings = Meeting::query()->where('user_id', $meeting->user_id)->where('status', 'completed')
             ->where(function ($query) use ($meeting): void {
@@ -285,6 +292,9 @@ class MeetingController extends Controller
 
         return view('meetings.show', [
             'meeting' => $meeting,
+            'statisticalPredictions' => $meeting->predictions->groupBy('generation')->last() ?? collect(),
+            'optimizationRecommendations' => $predictions->recommendationsFor($meeting, $request->user()),
+            'recommendationFeedback' => $meeting->recommendationFeedback->groupBy('recommendation_key')->map->first(),
             'members' => $meeting->users()->orderBy('name')->get(),
             'additionalMeetings' => Meeting::query()->where('user_id', $meeting->user_id)->where('status', 'completed')->where('id', '<>', $meeting->id)->orderByDesc('date')->get(['id', 'title', 'date']),
             'directorates' => Directorate::query()->where('active', true)->orderBy('name')->get(),
@@ -469,7 +479,7 @@ class MeetingController extends Controller
         return back()->with('success', 'Encaminhamento cadastrado.');
     }
 
-    public function updateActionItem(Request $request, Meeting $meeting, MeetingActionItem $actionItem): RedirectResponse
+    public function updateActionItem(Request $request, Meeting $meeting, MeetingActionItem $actionItem, MeetingPredictionService $predictions): RedirectResponse
     {
         $this->assertCanManageMeeting($request, $meeting);
         abort_unless($actionItem->meeting_id === $meeting->id, 404);
@@ -504,8 +514,22 @@ class MeetingController extends Controller
                 $actionItem->history()->create(['actor_id' => $request->user()->id, 'event' => $event, 'changes' => $changes, 'created_at' => now()]);
             }
         });
+        $predictions->evaluatePending($meeting->id);
 
         return back()->with('success', 'Encaminhamento atualizado.');
+    }
+
+    public function recommendationFeedback(Request $request, Meeting $meeting, MeetingPredictionService $predictions): RedirectResponse
+    {
+        $this->assertCanManageMeeting($request, $meeting);
+        $validated = $request->validate([
+            'recommendation_key' => ['required', 'string', 'max:100'],
+            'decision' => ['required', Rule::in(['accepted', 'rejected'])],
+            'rationale' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $predictions->recordFeedback($meeting, $request->user(), $validated['recommendation_key'], $validated['decision'], $validated['rationale'] ?? null);
+
+        return back()->with('success', 'Resposta à recomendação registrada para acompanhamento.');
     }
 
     public function storeDecision(Request $request, Meeting $meeting): RedirectResponse

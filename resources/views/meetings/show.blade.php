@@ -46,6 +46,53 @@
             </section>
 
             <section class="grid gap-6 lg:grid-cols-2">
+                <div class="rounded-lg border border-violet-200 bg-violet-50/40 p-5 shadow-sm">
+                    <h3 class="font-semibold text-gray-900">Previsões históricas</h3>
+                    <p class="mt-1 text-xs text-gray-600">Estimativas estatísticas validadas separadamente da análise generativa. Amostra insuficiente não produz valor previsto.</p>
+                    <div class="mt-3 space-y-3">
+                        @forelse ($statisticalPredictions->whereNotIn('prediction_type', ['planned_cost', 'recurring_monthly_cost', 'recurring_annual_cost']) as $prediction)
+                            <article class="rounded-md bg-white p-3">
+                                <p class="text-sm font-medium text-gray-800">{{ ['actual_duration_minutes' => 'Duração estimada', 'meetings_to_conclude' => 'Encontros prováveis para concluir', 'on_time_probability' => 'Conclusão no prazo', 'additional_meeting_risk' => 'Risco de encontro adicional', 'resolution_days' => 'Tempo estimado de resolução'][$prediction->prediction_type] ?? $prediction->prediction_type }}</p>
+                                @if ($prediction->status === 'validated' && $prediction->predicted_value !== null)
+                                    <p class="mt-1 text-lg font-semibold text-violet-900">{{ in_array($prediction->prediction_type, ['on_time_probability', 'additional_meeting_risk'], true) ? number_format($prediction->predicted_value * 100, 1, ',', '.').'%' : number_format($prediction->predicted_value, 1, ',', '.').' '.$prediction->unit }}</p>
+                                    <p class="text-xs text-gray-500">{{ $prediction->model_name }} v{{ $prediction->model_version }} · {{ $prediction->observations_count }} observações · {{ $prediction->validation_observations }} testes temporais · qualidade empírica {{ number_format(($prediction->confidence ?? 0) * 100, 1, ',', '.') }}% (não é probabilidade de acerto).</p>
+                                @else<p class="mt-1 text-sm text-amber-800">Histórico insuficiente para uma previsão validada. {{ $prediction->observations_count }} observações e {{ $prediction->validation_observations }} testes disponíveis.</p>@endif
+                            </article>
+                        @empty<p class="text-sm text-gray-500">Nenhuma previsão estatística disponível.</p>@endforelse
+                        @can('view-costs')
+                            @foreach ($statisticalPredictions->whereIn('prediction_type', ['planned_cost', 'recurring_monthly_cost', 'recurring_annual_cost']) as $prediction)
+                                <article class="rounded-md bg-white p-3"><p class="text-sm font-medium text-gray-800">{{ ['planned_cost' => 'Custo previsto determinístico', 'recurring_monthly_cost' => 'Projeção mensal da recorrência', 'recurring_annual_cost' => 'Projeção anual da recorrência'][$prediction->prediction_type] }}</p><p class="mt-1 text-lg font-semibold text-violet-900">R$ {{ number_format($prediction->predicted_value, 2, ',', '.') }}</p><p class="text-xs text-gray-500">Calculado pelo custo-hora real e frequência cadastrada · {{ $prediction->model_version }}</p></article>
+                            @endforeach
+                        @endcan
+                    </div>
+                </div>
+                <div class="rounded-lg border border-teal-200 bg-teal-50/30 p-5 shadow-sm">
+                    <h3 class="font-semibold text-gray-900">Assistente de otimização</h3>
+                    <p class="mt-1 text-xs text-gray-600">Orientações baseadas em regras e no histórico disponível; não são previsões estatísticas nem avaliação de desempenho individual.</p>
+                    <div class="mt-3 space-y-3">
+                        @forelse ($optimizationRecommendations as $recommendation)
+                            @php($recordedFeedback = $recommendationFeedback->get($recommendation['key']))
+                            <article class="rounded-md bg-white p-3">
+                                <h4 class="text-sm font-semibold text-gray-800">{{ $recommendation['title'] }}</h4>
+                                <p class="mt-1 text-sm text-gray-700">{{ $recommendation['reason'] }}</p>
+                                <p class="mt-1 text-sm text-gray-600">Orientação: {{ $recommendation['guidance'] }}</p>
+                                @can('view-costs') @if (isset($recommendation['estimated_saving']))<p class="mt-1 text-xs font-medium text-teal-800">Economia potencial estimada no cenário: R$ {{ number_format($recommendation['estimated_saving'], 2, ',', '.') }} com redução de {{ $recommendation['saving_scenario_minutes'] }} min; depende da duração efetiva.</p>@endif @endcan
+                                @if ($recordedFeedback)<p class="mt-2 text-xs text-gray-500">Resposta registrada: {{ $recordedFeedback->decision === 'accepted' ? 'aceita' : 'rejeitada' }}{{ $recordedFeedback->rationale ? ' · '.$recordedFeedback->rationale : '' }}</p>@endif
+                                @can('meetings.edit')
+                                    <form method="POST" action="{{ route('meetings.recommendations.feedback', $meeting) }}" class="mt-3 grid gap-2 sm:grid-cols-[1fr_2fr_auto]">@csrf
+                                        <input type="hidden" name="recommendation_key" value="{{ $recommendation['key'] }}">
+                                        <select name="decision" required class="rounded-md border-gray-300 text-sm"><option value="accepted">Aceitar orientação</option><option value="rejected">Rejeitar orientação</option></select>
+                                        <input name="rationale" maxlength="2000" placeholder="Motivo (opcional)" class="rounded-md border-gray-300 text-sm">
+                                        <button class="rounded-md bg-teal-700 px-3 py-2 text-xs font-semibold text-white">Registrar</button>
+                                    </form>
+                                @endcan
+                            </article>
+                        @empty<p class="text-sm text-gray-500">Nenhuma orientação contextual identificada para este registro.</p>@endforelse
+                    </div>
+                </div>
+            </section>
+
+            <section class="grid gap-6 lg:grid-cols-2">
                 <div class="rounded-lg bg-white p-5 shadow-sm">
                     <h3 class="font-semibold text-gray-900">Decisões</h3>
                     <ul class="mt-3 space-y-3">

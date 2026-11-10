@@ -9,15 +9,18 @@ use Illuminate\Support\Collection;
 
 class MeetingDashboardService
 {
-    public function __construct(private readonly MeetingCostCalculator $costs) {}
+    public function __construct(
+        private readonly MeetingCostCalculator $costs,
+        private readonly MeetingPredictionService $predictions,
+    ) {}
 
     /** @param array<string, mixed> $filters
      * @return array<string, mixed>
      */
     public function data(User $user, array $filters): array
     {
-        $meetings = $this->visibleMeetings($user);
-        $meetings = $meetings->filter(fn (Meeting $meeting): bool => $this->matches($meeting, $filters))->values();
+        $visibleMeetings = $this->visibleMeetings($user);
+        $meetings = $visibleMeetings->filter(fn (Meeting $meeting): bool => $this->matches($meeting, $filters))->values();
         $canViewCosts = $user->canViewCosts();
         $actionItems = $meetings->flatMap->actionItems->reject(fn (MeetingActionItem $item): bool => $item->status === 'canceled');
         $completed = $actionItems->filter(fn (MeetingActionItem $item): bool => $item->status === 'completed' || $item->completed_at !== null);
@@ -43,7 +46,7 @@ class MeetingDashboardService
         return [
             'meetings' => $meetings,
             'filters' => $filters,
-            'filterOptions' => $this->filterOptions($this->visibleMeetings($user), $user->hasPermission('reports.individuals')),
+            'filterOptions' => $this->filterOptions($visibleMeetings, $user->hasPermission('reports.individuals')),
             'canViewCosts' => $canViewCosts,
             'canViewIndividuals' => $user->hasPermission('reports.individuals'),
             'canExport' => $user->hasPermission('reports.export'),
@@ -73,6 +76,7 @@ class MeetingDashboardService
             'participation' => $this->participationBreakdown($meetings, $user->hasPermission('reports.individuals'), $canViewCosts),
             'efficiency' => $this->efficiencyBreakdown($meetings),
             'history' => $this->monthlyHistory($meetings, $canViewCosts),
+            'predictionInsights' => $this->predictions->dashboard($meetings, $visibleMeetings),
             'aiContext' => $this->aiContext($filters, $meetings, $actionItems, $actualCost, $estimatedCost, $recurringMonthlyProjection, $recurringAnnualProjection, $financial, $decisions, $collaboratorSeconds),
         ];
     }
@@ -83,7 +87,7 @@ class MeetingDashboardService
         $query = Meeting::query()->with([
             'project.team.directorate', 'organizer', 'users.jobPosition', 'meetingParticipants.user.team',
             'meetingParticipants.user.directorate', 'meetingParticipants.user.jobPosition', 'meetingParticipants.costSnapshot.team', 'meetingParticipants.costSnapshot.directorate',
-            'conclusion', 'decisions', 'actionItems', 'analyses',
+            'conclusion', 'decisions', 'actionItems.dependencies', 'analyses', 'predictions.evaluations', 'recommendationFeedback',
         ]);
         $subordinateIds = $user->subordinates()->pluck('users.id');
 
