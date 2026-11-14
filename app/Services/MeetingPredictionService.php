@@ -613,7 +613,7 @@ class MeetingPredictionService
     /** @return array<string, mixed> */
     private function recommendation(string $key, string $title, string $reason, string $steps, array $extra = []): array
     {
-        return ['key' => $key, 'title' => $title, 'reason' => $reason, 'steps' => $steps] + $extra;
+        return ['key' => $key, 'title' => $title, 'reason' => $reason, 'guidance' => $steps] + $extra;
     }
 
     /** @return array<int, string> */

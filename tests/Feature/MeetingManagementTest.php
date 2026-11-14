@@ -79,7 +79,7 @@ it('starts and pauses a meeting timer while persisting its elapsed time', functi
     $meeting = Meeting::create([
         'user_id' => $owner->id,
         'title' => 'Reunião para cronometrar',
-        'date' => '2026-10-16',
+        'date' => now('America/Sao_Paulo')->toDateString(),
         'duration_minutes' => 60,
         'actual_duration_seconds' => 15,
         'status' => 'scheduled',
@@ -112,6 +112,120 @@ it('starts and pauses a meeting timer while persisting its elapsed time', functi
         'actual_duration_seconds' => 90,
         'timer_started_at' => null,
         'status' => 'ongoing',
+    ]);
+
+    $this->travelBack();
+});
+
+it('returns 422 when starting a meeting scheduled on a past date', function () {
+    $this->travelTo('2026-11-14 10:00:00');
+    $owner = createUserWithPermissions(['meetings.view', 'meetings.edit']);
+    $meeting = Meeting::create([
+        'user_id' => $owner->id,
+        'organizer_id' => $owner->id,
+        'title' => 'Agenda vencida',
+        'date' => '2026-11-13',
+        'status' => 'scheduled',
+    ]);
+
+    $this->actingAs($owner)
+        ->postJson(route('meetings.timer.start', $meeting))
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'Esta agenda tem uma data passada. Reagende-a ou registre o encerramento com o motivo antes de continuar.');
+
+    $this->assertDatabaseHas('meetings', [
+        'id' => $meeting->id,
+        'timer_started_at' => null,
+        'status' => 'scheduled',
+        'date' => '2026-11-13 00:00:00',
+    ]);
+
+    $this->actingAs($owner)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertSee('Encerrar agenda')
+        ->assertSee('Reagendar agenda');
+
+    $this->actingAs($owner)
+        ->get(route('meetings.closeout', $meeting))
+        ->assertOk()
+        ->assertSee('Por que a reunião não aconteceu na data planejada?')
+        ->assertSee('Indicadores adicionais (opcional)')
+        ->assertDontSee('<pre');
+
+    $this->travelBack();
+});
+
+it('confirms an early start, reschedules the meeting, and requires the advance reason at conclusion', function () {
+    config(['services.ai.providers.gemini.api_key' => null]);
+    $this->travelTo('2026-11-14 10:00:00');
+    $owner = createUserWithPermissions(['meetings.view', 'meetings.edit', 'meetings.finish']);
+    $meeting = Meeting::create([
+        'user_id' => $owner->id,
+        'organizer_id' => $owner->id,
+        'title' => 'Agenda futura',
+        'date' => '2026-11-16',
+        'time' => '09:00',
+        'end_time' => '10:00',
+        'duration_minutes' => 60,
+        'status' => 'scheduled',
+    ]);
+
+    $this->actingAs($owner)
+        ->postJson(route('meetings.timer.start', $meeting))
+        ->assertStatus(409)
+        ->assertJsonPath('code', 'advance_confirmation_required');
+
+    $this->assertDatabaseHas('meetings', [
+        'id' => $meeting->id,
+        'date' => '2026-11-16 00:00:00',
+        'status' => 'scheduled',
+        'timer_started_at' => null,
+    ]);
+
+    $this->actingAs($owner)
+        ->postJson(route('meetings.timer.start', $meeting), ['confirm_advance' => true])
+        ->assertOk()
+        ->assertJsonPath('scheduledDate', '2026-11-14')
+        ->assertJsonPath('scheduledTime', '07:00');
+
+    $this->assertDatabaseHas('meetings', [
+        'id' => $meeting->id,
+        'date' => '2026-11-14 00:00:00',
+        'time' => '07:00',
+        'end_time' => '08:00',
+        'status' => 'ongoing',
+    ]);
+    expect($meeting->fresh()->schedule_advanced_at)->not->toBeNull();
+
+    $this->actingAs($owner)
+        ->postJson(route('meetings.finish', $meeting))
+        ->assertOk()
+        ->assertJsonPath('status', 'completed')
+        ->assertJsonPath('redirectUrl', route('meetings.closeout', $meeting));
+
+    $conclusion = [
+        'summary' => 'A reunião foi antecipada e concluída.',
+        'outcome' => 'A equipe aprovou o plano de trabalho.',
+        'objective_achievement' => 'yes',
+    ];
+
+    $this->actingAs($owner)
+        ->put(route('meetings.conclusion.save', $meeting), $conclusion)
+        ->assertInvalid([
+            'schedule_change_reason' => 'Informe o motivo da antecipação ou da não realização na data planejada.',
+        ]);
+
+    $this->actingAs($owner)
+        ->put(route('meetings.conclusion.save', $meeting), $conclusion + [
+            'schedule_change_reason' => 'Uma decisão urgente exigiu reunir a equipe antes.',
+        ])
+        ->assertRedirect(route('meetings.closeout', $meeting))
+        ->assertSessionHasNoErrors();
+
+    $this->assertDatabaseHas('meeting_conclusions', [
+        'meeting_id' => $meeting->id,
+        'schedule_change_reason' => 'Uma decisão urgente exigiu reunir a equipe antes.',
     ]);
 
     $this->travelBack();
@@ -272,6 +386,66 @@ it('does not stop a timer that is not running', function () {
         'timer_started_at' => null,
         'status' => 'scheduled',
     ]);
+});
+
+it('requires a reason and conclusion data before closing a past unstarted meeting', function () {
+    config(['services.ai.providers.gemini.api_key' => null]);
+    $this->travelTo('2026-11-14 10:00:00');
+    $owner = createUserWithPermissions(['meetings.view', 'meetings.edit']);
+    $meeting = Meeting::create([
+        'user_id' => $owner->id,
+        'organizer_id' => $owner->id,
+        'title' => 'Agenda sem realização',
+        'date' => '2026-11-13',
+        'status' => 'scheduled',
+    ]);
+    $conclusion = [
+        'summary' => 'A agenda não ocorreu na data prevista.',
+        'outcome' => 'A pauta foi transferida para outro encontro.',
+        'objective_achievement' => 'no',
+    ];
+
+    $this->actingAs($owner)
+        ->get(route('meetings.show', $meeting))
+        ->assertOk()
+        ->assertSee('Motivo da não realização na data planejada')
+        ->assertDontSee('<pre');
+
+    $this->actingAs($owner)
+        ->get(route('meetings.closeout', $meeting))
+        ->assertOk()
+        ->assertSee('Conclusão da reunião')
+        ->assertDontSee('<pre');
+
+    $this->actingAs($owner)
+        ->put(route('meetings.conclusion.save', $meeting), $conclusion)
+        ->assertInvalid([
+            'schedule_change_reason' => 'Informe o motivo da antecipação ou da não realização na data planejada.',
+        ]);
+
+    $this->assertDatabaseHas('meetings', [
+        'id' => $meeting->id,
+        'status' => 'scheduled',
+    ]);
+
+    $this->actingAs($owner)
+        ->put(route('meetings.conclusion.save', $meeting), $conclusion + [
+            'schedule_change_reason' => 'Os participantes-chave tiveram um imprevisto.',
+        ])
+        ->assertRedirect(route('meetings.closeout', $meeting))
+        ->assertSessionHasNoErrors();
+
+    $this->assertDatabaseHas('meetings', [
+        'id' => $meeting->id,
+        'status' => 'completed',
+        'actual_duration_seconds' => null,
+    ]);
+    $this->assertDatabaseHas('meeting_conclusions', [
+        'meeting_id' => $meeting->id,
+        'schedule_change_reason' => 'Os participantes-chave tiveram um imprevisto.',
+    ]);
+
+    $this->travelBack();
 });
 
 it('user can create a meeting', function () {

@@ -11,6 +11,7 @@ class MeetingConclusion extends Model
         'meeting_id', 'recorded_by', 'summary', 'outcome', 'objective_achievement', 'decisions_count',
         'completed_topics_count', 'pending_topics', 'objective_changed', 'duration_sufficient', 'time_well_used',
         'replaceable_by_email', 'needs_follow_up', 'productivity_score', 'investment_return_score', 'concluded_at',
+        'schedule_change_reason',
     ];
 
     protected function casts(): array

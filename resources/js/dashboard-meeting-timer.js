@@ -24,8 +24,27 @@ export default (meetings = [], initialMeetingId = null) => ({
         return Boolean(this.selectedMeeting?.timerStartedAt);
     },
 
+    get isPast() {
+        const scheduledDate = this.selectedMeeting?.scheduledDate;
+
+        if (!scheduledDate) return false;
+
+        const meetingDay = new Date(`${scheduledDate}T00:00:00`);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        return meetingDay < today;
+    },
+
     get canStart() {
-        return this.selectedMeeting && !this.isRunning && !['completed', 'canceled'].includes(this.selectedMeeting.status);
+        return this.selectedMeeting
+            && !this.isPast
+            && !this.isRunning
+            && !['completed', 'canceled'].includes(this.selectedMeeting.status);
+    },
+
+    get canClosePast() {
+        return this.isPast && !this.isRunning && ['draft', 'scheduled'].includes(this.selectedMeeting?.status);
     },
 
     get canFinish() {
@@ -70,10 +89,22 @@ export default (meetings = [], initialMeetingId = null) => ({
         this.error = '';
 
         try {
-            const response = await this.sendTimerRequest(this.selectedMeeting.startUrl);
+            let response;
+
+            try {
+                response = await this.sendTimerRequest(this.selectedMeeting.startUrl);
+            } catch (error) {
+                if (error.code !== 'advance_confirmation_required') throw error;
+
+                if (!window.confirm(error.message)) return;
+
+                response = await this.sendTimerRequest(this.selectedMeeting.startUrl, { confirm_advance: true });
+            }
 
             this.selectedMeeting.actualDurationSeconds = response.actualDurationSeconds;
             this.selectedMeeting.timerStartedAt = response.timerStartedAt;
+            this.selectedMeeting.scheduledDate = response.scheduledDate;
+            this.selectedMeeting.date = new Date(`${response.scheduledDate}T00:00:00`).toLocaleDateString('pt-BR');
             this.startTicking();
         } catch (error) {
             this.error = error instanceof Error ? error.message : 'Não foi possível iniciar o cronômetro.';
@@ -122,7 +153,7 @@ export default (meetings = [], initialMeetingId = null) => ({
         }
     },
 
-    async sendTimerRequest(url) {
+    async sendTimerRequest(url, payload = null) {
         const csrfToken = document.querySelector('meta[name="csrf-token"]');
 
         if (!csrfToken) {
@@ -134,12 +165,14 @@ export default (meetings = [], initialMeetingId = null) => ({
             headers: {
                 Accept: 'application/json',
                 'X-CSRF-TOKEN': csrfToken.content,
+                ...(payload ? { 'Content-Type': 'application/json' } : {}),
             },
+            body: payload ? JSON.stringify(payload) : undefined,
         });
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.message || 'Não foi possível atualizar o cronômetro.');
+            throw Object.assign(new Error(data.message || 'Não foi possível atualizar o cronômetro.'), { code: data.code });
         }
 
         return data;

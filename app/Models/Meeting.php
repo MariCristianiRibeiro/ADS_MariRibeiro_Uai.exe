@@ -29,6 +29,8 @@ class Meeting extends Model
         'duration_minutes',
         'actual_duration_seconds',
         'timer_started_at',
+        'schedule_advanced_at',
+        'reschedule_reason',
         'location',
         'meeting_format',
         'agenda',
@@ -49,6 +51,7 @@ class Meeting extends Model
         'duration_minutes' => 'integer',
         'actual_duration_seconds' => 'integer',
         'timer_started_at' => 'datetime',
+        'schedule_advanced_at' => 'datetime',
         'recurrence_interval' => 'integer',
     ];
 

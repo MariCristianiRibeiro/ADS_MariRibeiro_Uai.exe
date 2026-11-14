@@ -26,6 +26,8 @@ use Illuminate\View\View;
 
 class MeetingController extends Controller
 {
+    private const MEETING_TIMEZONE = 'America/Sao_Paulo';
+
     public function index(Request $request): View
     {
         abort_unless($request->user()->hasPermission('meetings.view'), 403);
@@ -52,15 +54,61 @@ class MeetingController extends Controller
         ]);
     }
 
-    public function startTimer(Meeting $meeting): JsonResponse
+    public function closeout(Request $request, Meeting $meeting): View
+    {
+        abort_unless($request->user()->hasPermission('meetings.edit'), 403);
+        abort_unless($meeting->organizer_id === $request->user()->id, 403);
+
+        $isPastUnstarted = in_array($meeting->status, ['draft', 'scheduled'], true)
+            && $meeting->timer_started_at === null
+            && $this->meetingDateIsPast($meeting);
+        abort_unless(
+            $meeting->status === 'completed' || $isPastUnstarted,
+            409,
+            'Encerre ou finalize a reunião antes de registrar a conclusão.',
+        );
+
+        $meeting->loadMissing(['conclusion', 'meetingParticipants.user']);
+
+        return view('meetings.closeout', [
+            'meeting' => $meeting,
+            'isPastUnstarted' => $isPastUnstarted,
+            'requiresScheduleChangeReason' => $meeting->schedule_advanced_at !== null
+                || $isPastUnstarted
+                || filled($meeting->conclusion?->schedule_change_reason),
+        ]);
+    }
+
+    public function startTimer(Request $request, Meeting $meeting, MeetingPredictionService $predictions): JsonResponse
     {
         abort_unless(Auth::user()->hasPermission('meetings.edit'), 403);
         abort_unless($meeting->user_id === Auth::id(), 403);
 
-        $meeting = DB::transaction(function () use ($meeting): Meeting {
+        if ($meeting->timer_started_at === null && $this->meetingDateIsPast($meeting)) {
+            return response()->json([
+                'message' => 'Esta agenda tem uma data passada. Reagende-a ou registre o encerramento com o motivo antes de continuar.',
+            ], 422);
+        }
+
+        if ($meeting->timer_started_at === null
+            && $this->meetingStartIsInFuture($meeting)
+            && ! $request->boolean('confirm_advance')) {
+            return response()->json([
+                'code' => 'advance_confirmation_required',
+                'message' => 'Esta agenda está marcada para uma data ou horário futuro. Iniciá-la agora antecipará a reunião e atualizará a data e o horário para o momento atual. Deseja continuar?',
+            ], 409);
+        }
+
+        $scheduleAdvanced = false;
+        $meeting = DB::transaction(function () use ($meeting, $request, &$scheduleAdvanced): Meeting {
             $meeting = Meeting::query()->lockForUpdate()->findOrFail($meeting->id);
 
             abort_unless($meeting->user_id === Auth::id(), 403);
+            abort_if(
+                $meeting->timer_started_at === null && $this->meetingDateIsPast($meeting),
+                422,
+                'Esta agenda tem uma data passada. Reagende-a ou registre o encerramento com o motivo antes de continuar.',
+            );
             abort_if(
                 in_array($meeting->status, ['completed', 'canceled'], true),
                 422,
@@ -68,6 +116,22 @@ class MeetingController extends Controller
             );
 
             if ($meeting->timer_started_at === null) {
+                if ($this->meetingStartIsInFuture($meeting)) {
+                    abort_unless(
+                        $request->boolean('confirm_advance'),
+                        409,
+                        'A agenda foi alterada. Confirme novamente a antecipação antes de iniciar.',
+                    );
+
+                    $localNow = now(self::MEETING_TIMEZONE);
+                    $meeting->date = $localNow->toDateString();
+                    $meeting->time = $localNow->format('H:i');
+                    $newEndTime = $localNow->copy()->addMinutes((int) ($meeting->duration_minutes ?? 0));
+                    $meeting->end_time = $newEndTime->isSameDay($localNow) ? $newEndTime->format('H:i') : null;
+                    $meeting->schedule_advanced_at = now();
+                    $scheduleAdvanced = true;
+                }
+
                 $meeting->timer_started_at = now();
                 $meeting->status = 'ongoing';
                 $meeting->save();
@@ -76,9 +140,15 @@ class MeetingController extends Controller
             return $meeting;
         });
 
+        if ($scheduleAdvanced) {
+            $predictions->generateFor($meeting, $request->user(), regenerate: true);
+        }
+
         return response()->json([
             'actualDurationSeconds' => $meeting->actual_duration_seconds ?? 0,
             'timerStartedAt' => $meeting->timer_started_at?->toIso8601String(),
+            'scheduledDate' => $meeting->date->toDateString(),
+            'scheduledTime' => $meeting->time ? substr($meeting->time, 0, 5) : null,
         ]);
     }
 
@@ -145,7 +215,9 @@ class MeetingController extends Controller
             'actualDurationSeconds' => $meeting->actual_duration_seconds ?? 0,
             'timerStartedAt' => null,
             'status' => $meeting->status,
-            'redirectUrl' => route('meetings.show', $meeting),
+            'redirectUrl' => $meeting->schedule_advanced_at !== null
+                ? route('meetings.closeout', $meeting)
+                : route('meetings.show', $meeting),
         ]);
     }
 
@@ -307,8 +379,13 @@ class MeetingController extends Controller
                 $query->whereKey($meeting->id)->orWhereHas('actionItems', fn ($items) => $items->where('follow_up_meeting_id', $meeting->id));
             })->with('meetingParticipants')->get();
 
+        $isPastUnstarted = in_array($meeting->status, ['draft', 'scheduled'], true)
+            && $meeting->timer_started_at === null
+            && $this->meetingDateIsPast($meeting);
+
         return view('meetings.show', [
             'meeting' => $meeting,
+            'isPastUnstarted' => $isPastUnstarted,
             'statisticalPredictions' => $meeting->predictions->groupBy('generation')->last() ?? collect(),
             'optimizationRecommendations' => $predictions->recommendationsFor($meeting, $request->user()),
             'recommendationFeedback' => $meeting->recommendationFeedback->groupBy('recommendation_key')->map->first(),
@@ -394,8 +471,12 @@ class MeetingController extends Controller
         ]);
     }
 
-    public function update(Request $request, Meeting $meeting, MeetingCostCalculator $costCalculator): RedirectResponse
-    {
+    public function update(
+        Request $request,
+        Meeting $meeting,
+        MeetingCostCalculator $costCalculator,
+        MeetingPredictionService $predictions,
+    ): RedirectResponse {
         abort_unless($request->user()->hasPermission('meetings.edit'), 403);
 
         abort_unless($meeting->user_id === Auth::id(), 403);
@@ -407,7 +488,15 @@ class MeetingController extends Controller
             'recurrence_type' => $request->input('recurrence_type', $meeting->recurrence_type ?? 'single'),
         ]);
 
-        $validated = $this->validateMeeting($request);
+        $scheduleChanged = $meeting->date?->toDateString() !== $request->input('date')
+            || ($meeting->time ? substr((string) $meeting->time, 0, 5) : null) !== ($request->input('time') ?: null)
+            || ($meeting->end_time ? substr((string) $meeting->end_time, 0, 5) : null) !== ($request->input('end_time') ?: null);
+        $validated = $this->validateMeeting($request, $scheduleChanged);
+        if ($scheduleChanged) {
+            $validated['schedule_advanced_at'] = null;
+        } else {
+            unset($validated['reschedule_reason']);
+        }
         $requestedIds = collect($validated['participants'] ?? []);
         $participantUserIds = $this->resolveParticipantUserIds($requestedIds);
         $attendance = $validated['attendance'] ?? [];
@@ -420,6 +509,10 @@ class MeetingController extends Controller
             $meeting->update($validated);
             $this->syncParticipants($meeting, $requestedIds, $participantUserIds, $attendance, $roles, $invitations, $confirmations, $costCalculator);
         });
+
+        if ($scheduleChanged) {
+            $predictions->generateFor($meeting, $request->user(), regenerate: true);
+        }
 
         return redirect()->route('meetings.index')->with('success', 'Reunião atualizada com sucesso.');
     }
@@ -559,13 +652,28 @@ class MeetingController extends Controller
         Meeting $meeting,
         MeetingAiService $aiService,
         MeetingPredictionService $predictions,
-    ): RedirectResponse
-    {
+    ): RedirectResponse {
         abort_unless($request->user()->hasPermission('meetings.edit'), 403);
         abort_unless($meeting->organizer_id === $request->user()->id, 403);
-        abort_unless($meeting->status === 'completed', 409, 'Finalize a reunião antes de registrar a conclusão.');
+        $isPastUnstarted = in_array($meeting->status, ['draft', 'scheduled'], true)
+            && $meeting->timer_started_at === null
+            && $this->meetingDateIsPast($meeting);
+        $useSimpleCloseout = $isPastUnstarted || $meeting->schedule_advanced_at !== null;
+        abort_unless(
+            $meeting->status === 'completed' || $isPastUnstarted,
+            409,
+            'Finalize a reunião antes de registrar a conclusão.',
+        );
 
         $validated = $request->validate([
+            'schedule_change_reason' => [
+                $meeting->schedule_advanced_at !== null || $isPastUnstarted || filled($meeting->conclusion?->schedule_change_reason)
+                    ? 'required'
+                    : 'nullable',
+                'string',
+                'min:10',
+                'max:5000',
+            ],
             'summary' => ['required', 'string', 'min:10', 'max:10000'],
             'outcome' => ['required', 'string', 'min:10', 'max:10000'],
             'objective_achievement' => ['required', Rule::in(['yes', 'partially', 'no'])],
@@ -586,12 +694,20 @@ class MeetingController extends Controller
             'participation.*.contributed_to_decision' => ['nullable', 'boolean'],
             'participation.*.participation_necessary' => ['nullable', 'boolean'],
             'participation.*.self_rating' => ['nullable', 'integer', 'between:1,5'],
+        ], [
+            'schedule_change_reason.required' => 'Informe o motivo da antecipação ou da não realização na data planejada.',
+            'schedule_change_reason.min' => 'O motivo da alteração da agenda deve ter pelo menos 10 caracteres.',
         ]);
 
         $participation = $validated['participation'] ?? [];
         unset($validated['participation']);
 
-        DB::transaction(function () use ($meeting, $validated, $request, $participation): void {
+        DB::transaction(function () use ($meeting, $validated, $request, $participation, $isPastUnstarted): void {
+            if ($isPastUnstarted) {
+                $meeting->status = 'completed';
+                $meeting->save();
+            }
+
             $meeting->conclusion()->updateOrCreate([], [
                 ...$validated,
                 'recorded_by' => $request->user()->id,
@@ -606,7 +722,7 @@ class MeetingController extends Controller
         $predictions->evaluatePending($meeting->id);
 
         if (! $aiService->isConfigured()) {
-            return back()
+            return ($useSimpleCloseout ? redirect()->route('meetings.closeout', $meeting) : back())
                 ->with('success', 'Conclusão registrada e dados preservados para análises futuras.')
                 ->with('warning', 'Configure a chave do provedor de IA no servidor para gerar os insights desta reunião.');
         }
@@ -614,6 +730,7 @@ class MeetingController extends Controller
         $analysisNotes = collect([
             'Resumo informado: '.$validated['summary'],
             'Resultado obtido: '.$validated['outcome'],
+            filled($validated['schedule_change_reason'] ?? null) ? 'Motivo da alteração da agenda: '.$validated['schedule_change_reason'] : null,
             filled($validated['pending_topics'] ?? null) ? 'Assuntos pendentes: '.$validated['pending_topics'] : null,
         ])->filter()->implode("\n\n");
         $analysis = $this->generateMeetingAnalysis(
@@ -625,12 +742,13 @@ class MeetingController extends Controller
         );
 
         if ($analysis->status === 'failed') {
-            return back()
+            return ($useSimpleCloseout ? redirect()->route('meetings.closeout', $meeting) : back())
                 ->with('success', 'Conclusão registrada e dados preservados para análises futuras.')
                 ->with('warning', 'A conclusão foi salva, mas a análise por IA falhou. Você pode tentar novamente na seção de insights.');
         }
 
-        return back()->with('success', 'Conclusão registrada e insights gerados. Os dados também serão usados nas análises futuras.');
+        return ($useSimpleCloseout ? redirect()->route('meetings.closeout', $meeting) : back())
+            ->with('success', 'Conclusão registrada e insights gerados. Os dados também serão usados nas análises futuras.');
     }
 
     public function storeParticipantFeedback(Request $request, Meeting $meeting): RedirectResponse
@@ -828,6 +946,7 @@ class MeetingController extends Controller
                     'time_well_used',
                     'replaceable_by_email',
                     'needs_follow_up',
+                    'schedule_change_reason',
                     'decisions_count',
                     'completed_topics_count',
                     'pending_topics',
@@ -901,6 +1020,7 @@ class MeetingController extends Controller
                 'assuntos_pendentes' => $meeting->conclusion?->pending_topics,
                 'avaliacao_produtividade' => $meeting->conclusion?->productivity_score,
                 'retorno_investimento_percebido' => $meeting->conclusion?->investment_return_score,
+                'motivo_alteracao_agenda' => $meeting->conclusion?->schedule_change_reason,
             ],
             'avaliacoes_agregadas_dos_participantes' => $feedback->isEmpty() ? null : $feedback->map(fn ($entry): array => $entry->only(['clarity_score', 'objectivity_score', 'organization_score', 'time_management_score', 'participation_score', 'effectiveness_score', 'suggestion', 'comments']))->values(),
             'previsao_inicial_preservada' => $initialForecast === null ? null : [
@@ -1038,9 +1158,15 @@ class MeetingController extends Controller
         ];
     }
 
-    private function validateMeeting(Request $request): array
+    private function validateMeeting(Request $request, bool $isReschedule = false): array
     {
-        $validated = $request->validate($this->meetingRules());
+        $rules = $this->meetingRules();
+        $rules['reschedule_reason'] = $isReschedule
+            ? ['required', 'string', 'min:10', 'max:5000']
+            : ['nullable', 'string', 'max:5000'];
+        $validated = $request->validate($rules, [
+            'reschedule_reason.required' => 'Informe o motivo do reagendamento ao alterar a data ou o horário.',
+        ]);
 
         if (filled($validated['time'] ?? null) && filled($validated['end_time'] ?? null)) {
             [$startHour, $startMinute] = array_map('intval', explode(':', $validated['time']));
@@ -1049,6 +1175,22 @@ class MeetingController extends Controller
         }
 
         return $validated;
+    }
+
+    private function meetingDateIsPast(Meeting $meeting): bool
+    {
+        return $meeting->date->toDateString() < now(self::MEETING_TIMEZONE)->toDateString();
+    }
+
+    private function meetingStartIsInFuture(Meeting $meeting): bool
+    {
+        $localNow = now(self::MEETING_TIMEZONE);
+        $scheduledDate = $meeting->date->toDateString();
+
+        return $scheduledDate > $localNow->toDateString()
+            || ($scheduledDate === $localNow->toDateString()
+                && $meeting->time !== null
+                && substr((string) $meeting->time, 0, 8) > $localNow->format('H:i:s'));
     }
 
     /** @return array<int, int> */

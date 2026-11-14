@@ -96,7 +96,7 @@
                 </div>
             </section>
 
-            <section class="grid gap-6 lg:grid-cols-2">
+            <section id="conclusion" class="grid gap-6 lg:grid-cols-2">
                 <div class="rounded-lg bg-white p-5 shadow-sm">
                     <h3 class="font-semibold text-gray-900">Decisões</h3>
                     <ul class="mt-3 space-y-3">
@@ -116,9 +116,17 @@
                 <div class="rounded-lg bg-white p-5 shadow-sm">
                     <h3 class="font-semibold text-gray-900">Conclusão</h3>
                     @if ($meeting->conclusion)<p class="mt-2 text-xs text-gray-500">Registrada por {{ $meeting->conclusion->recorder?->name ?? 'usuário removido' }} · {{ $meeting->conclusion->concluded_at?->format('d/m/Y H:i') }}</p>@endif
-                    @if ($meeting->status === 'completed' && auth()->id() === $meeting->organizer_id && auth()->user()->can('meetings.edit'))
+                    @if (($meeting->status === 'completed' || $isPastUnstarted) && auth()->id() === $meeting->organizer_id && auth()->user()->can('meetings.edit'))
                     <form method="POST" action="{{ route('meetings.conclusion.save', $meeting) }}" class="mt-3 space-y-3">@csrf @method('PUT')
-                        <p class="text-sm text-gray-600">Informe o resultado real. Esses dados serão preservados para os insights da IA e análises futuras, incluindo reuniões recorrentes.</p>
+                        @if ($isPastUnstarted)
+                            <p class="rounded-md bg-amber-50 p-3 text-sm text-amber-900">Esta agenda venceu sem iniciar o cronômetro. Informe por que não foi realizada na data planejada e preencha os dados de conclusão para encerrá-la.</p>
+                        @else
+                            <p class="text-sm text-gray-600">Informe o resultado real. Esses dados serão preservados para os insights da IA e análises futuras, incluindo reuniões recorrentes.</p>
+                        @endif
+                        @if ($meeting->schedule_advanced_at !== null || $isPastUnstarted)
+                            <label class="block text-sm font-medium text-gray-700">Motivo da {{ $isPastUnstarted ? 'não realização na data planejada' : 'antecipação da agenda' }}<textarea name="schedule_change_reason" required minlength="10" maxlength="5000" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">{{ old('schedule_change_reason', $meeting->conclusion?->schedule_change_reason) }}</textarea></label>
+                            @error('schedule_change_reason') <span class="text-sm text-red-600">{{ $message }}</span> @enderror
+                        @endif
                         <label class="block text-sm font-medium text-gray-700">Resumo<textarea name="summary" required minlength="10" maxlength="10000" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">{{ old('summary', $meeting->conclusion?->summary) }}</textarea></label>
                         <label class="block text-sm font-medium text-gray-700">Resultado obtido<textarea name="outcome" required minlength="10" maxlength="10000" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">{{ old('outcome', $meeting->conclusion?->outcome) }}</textarea></label>
                         <div class="grid gap-3 sm:grid-cols-2">
@@ -141,8 +149,9 @@
                         @if ($meeting->conclusion)
                             <p class="mt-3 text-sm text-gray-700"><strong>Resumo:</strong> {{ $meeting->conclusion->summary }}</p>
                             <p class="mt-2 text-sm text-gray-700"><strong>Resultado:</strong> {{ $meeting->conclusion->outcome }}</p>
+                            @if ($meeting->conclusion->schedule_change_reason)<p class="mt-2 text-sm text-gray-700"><strong>Motivo da alteração da agenda:</strong> {{ $meeting->conclusion->schedule_change_reason }}</p>@endif
                         @endif
-                        @if ($meeting->status !== 'completed')
+                        @if ($meeting->status !== 'completed' && ! $isPastUnstarted)
                             <p class="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800">Finalize o cronômetro para liberar o registro da conclusão.</p>
                         @elseif (auth()->id() !== $meeting->organizer_id)
                             <p class="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800">O organizador da reunião deve preencher e salvar a conclusão.</p>
@@ -218,9 +227,30 @@
 
             <section class="rounded-lg bg-white p-5 shadow-sm">
                 <h3 class="font-semibold text-gray-900">Histórico</h3>
+                @php($historyEventLabels = ['created' => 'Agenda criada', 'updated' => 'Dados da agenda atualizados', 'status_changed' => 'Situação atualizada', 'rescheduled' => 'Agenda reagendada', 'canceled' => 'Agenda cancelada'])
+                @php($historyFieldLabels = ['date' => 'Data', 'time' => 'Horário de início', 'end_time' => 'Horário de término', 'status' => 'Situação', 'schedule_advanced_at' => 'Antecipada em', 'reschedule_reason' => 'Motivo do reagendamento', 'title' => 'Título', 'location' => 'Local'])
                 <ol class="mt-3 space-y-3">
                     @forelse ($meeting->history as $event)
-                        <li class="border-l-2 border-teal-600 pl-3"><p class="text-sm font-medium text-gray-800">{{ str_replace('_', ' ', $event->event) }}</p><p class="text-xs text-gray-500">{{ $event->actor?->name ?? 'Sistema' }} · {{ $event->created_at?->format('d/m/Y H:i:s') }}</p>@if ($event->changes)<pre class="mt-1 overflow-x-auto whitespace-pre-wrap text-xs text-gray-600">{{ json_encode($event->changes, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>@endif</li>
+                        <li class="border-l-2 border-teal-600 pl-3">
+                            <p class="text-sm font-medium text-gray-800">{{ $historyEventLabels[$event->event] ?? 'Atualização da agenda' }}</p>
+                            <p class="text-xs text-gray-500">{{ $event->actor?->name ?? 'Sistema' }} · {{ $event->created_at?->format('d/m/Y H:i') }}</p>
+                            @if (is_array($event->changes) && $event->changes !== [])
+                                <ul class="mt-2 space-y-1 text-sm text-gray-600">
+                                    @foreach ($event->changes as $field => $change)
+                                        <li>
+                                            <strong>{{ $historyFieldLabels[$field] ?? ucfirst(str_replace('_', ' ', $field)) }}:</strong>
+                                            @if (is_array($change) && (array_key_exists('old', $change) || array_key_exists('new', $change)))
+                                                {{ $field === 'status' ? (['draft' => 'Rascunho', 'scheduled' => 'Agendada', 'ongoing' => 'Em andamento', 'completed' => 'Concluída', 'canceled' => 'Cancelada'][$change['old'] ?? ''] ?? ($change['old'] ?? 'Não informado')) : (is_scalar($change['old'] ?? null) ? ($change['old'] ?? 'Não informado') : 'Atualizado') }}
+                                                <span aria-hidden="true">→</span>
+                                                {{ $field === 'status' ? (['draft' => 'Rascunho', 'scheduled' => 'Agendada', 'ongoing' => 'Em andamento', 'completed' => 'Concluída', 'canceled' => 'Cancelada'][$change['new'] ?? ''] ?? ($change['new'] ?? 'Não informado')) : (is_scalar($change['new'] ?? null) ? ($change['new'] ?? 'Não informado') : 'Atualizado') }}
+                                            @else
+                                                {{ is_scalar($change) ? $change : 'Atualizado' }}
+                                            @endif
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </li>
                     @empty <li class="text-sm text-gray-500">Sem eventos registrados.</li> @endforelse
                 </ol>
             </section>

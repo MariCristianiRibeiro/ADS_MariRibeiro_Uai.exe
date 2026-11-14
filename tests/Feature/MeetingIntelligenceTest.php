@@ -9,6 +9,7 @@ use App\Models\MeetingParticipant;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\MeetingCostCalculator;
+use App\Services\MeetingPredictionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -129,11 +130,41 @@ it('records schedule changes and cancellation without deleting the meeting', fun
         'priority' => 'normal',
         'recurrence_type' => 'single',
         'status' => 'scheduled',
+    ])->assertInvalid([
+        'reschedule_reason' => 'Informe o motivo do reagendamento ao alterar a data ou o horário.',
+    ]);
+
+    $this->assertDatabaseHas('meetings', [
+        'id' => $meeting->id,
+        'date' => '2026-12-02 00:00:00',
+    ]);
+
+    app(MeetingPredictionService::class)->generateFor($meeting, $owner);
+
+    $this->actingAs($owner)->put(route('meetings.update', $meeting), [
+        'title' => $meeting->title,
+        'organizer_id' => $owner->id,
+        'date' => '2026-12-03',
+        'time' => '11:00',
+        'end_time' => '12:00',
+        'reschedule_reason' => 'O responsável precisou alterar a disponibilidade.',
+        'duration_minutes' => 60,
+        'priority' => 'normal',
+        'recurrence_type' => 'single',
+        'status' => 'scheduled',
     ])->assertRedirect(route('meetings.index'));
 
     $meeting->refresh();
 
-    expect($meeting->history()->where('event', 'rescheduled')->exists())->toBeTrue();
+    $scheduleHistory = $meeting->history()->where('event', 'rescheduled')->firstOrFail();
+
+    expect(data_get($scheduleHistory->changes, 'reschedule_reason.new'))
+        ->toBe('O responsável precisou alterar a disponibilidade.');
+    $this->assertDatabaseHas('meeting_predictions', [
+        'meeting_id' => $meeting->id,
+        'generation' => 2,
+        'prediction_type' => 'actual_duration_minutes',
+    ]);
 
     $this->actingAs($owner)->patch(route('meetings.cancel', $meeting))->assertRedirect(route('meetings.index'));
 

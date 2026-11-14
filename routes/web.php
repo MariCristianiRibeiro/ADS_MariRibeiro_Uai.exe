@@ -29,6 +29,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/projects', [ProjectController::class, 'index'])->middleware('permission:projects.view')->name('projects.index');
     Route::get('/projects/create', [ProjectController::class, 'create'])->middleware('permission:projects.create')->name('projects.create');
     Route::post('/projects', [ProjectController::class, 'store'])->middleware('permission:projects.create')->name('projects.store');
+    Route::get('/meetings/{meeting}/closeout', [MeetingController::class, 'closeout'])->middleware('permission:meetings.view')->name('meetings.closeout');
     Route::post('/meetings/{meeting}/timer/start', [MeetingController::class, 'startTimer'])->middleware('permission:meetings.view')->name('meetings.timer.start');
     Route::post('/meetings/{meeting}/timer/stop', [MeetingController::class, 'stopTimer'])->middleware('permission:meetings.view')->name('meetings.timer.stop');
     Route::post('/meetings/{meeting}/finish', [MeetingController::class, 'finish'])->middleware('permission:meetings.view')->name('meetings.finish');

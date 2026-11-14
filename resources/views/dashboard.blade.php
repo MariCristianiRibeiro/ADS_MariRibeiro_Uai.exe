@@ -51,10 +51,15 @@
 
                         <div class="mt-5 flex flex-col gap-4">
                             <p x-show="isRunning" class="text-sm font-medium text-green-700">O cronômetro continua contando mesmo se você atualizar a página.</p>
+                            <p x-show="canClosePast" class="text-sm font-medium text-amber-800">Esta agenda venceu e não pode ser iniciada com a data antiga. Você pode encerrá-la informando o motivo e os dados de conclusão, ou reagendá-la.</p>
                             <p x-show="selectedMeeting?.status === 'completed'" class="text-sm font-medium text-slate-600">Reunião encerrada. O tempo e o investimento foram salvos para os relatórios.</p>
                             <p x-show="error" class="text-sm font-medium text-red-700" x-text="error"></p>
                             <div class="flex flex-col items-stretch gap-3 sm:items-end">
                                 <button type="button" x-show="canStart" x-on:click="start()" x-bind:disabled="processing" class="dashboard-action justify-center disabled:cursor-wait disabled:opacity-60">Iniciar cronômetro</button>
+                                <div x-show="canClosePast" class="flex flex-col gap-3 sm:flex-row">
+                                    <a x-bind:href="selectedMeeting?.closeoutUrl" class="dashboard-action justify-center">Encerrar agenda</a>
+                                    <a x-bind:href="selectedMeeting?.editUrl" class="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-800 shadow-sm transition hover:bg-slate-50">Reagendar agenda</a>
+                                </div>
                                 <button type="button" x-show="isRunning" x-on:click="stop()" x-bind:disabled="processing" class="dashboard-action disabled:cursor-wait disabled:opacity-60">Pausar e salvar tempo</button>
                                 <button type="button" x-show="canFinish" x-on:click="finish()" x-bind:disabled="processing" class="inline-flex items-center justify-center rounded-md border border-red-200 bg-white px-5 py-3 text-sm font-bold text-red-700 shadow-sm transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-60">
                                     <span x-text="processing ? 'Finalizando...' : 'Finalizar reunião e encerrar cálculo'"></span>

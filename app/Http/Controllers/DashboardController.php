@@ -48,6 +48,7 @@ class DashboardController extends Controller
                     'id' => $meeting->id,
                     'title' => $meeting->title,
                     'date' => $meeting->date->format('d/m/Y'),
+                    'scheduledDate' => $meeting->date->toDateString(),
                     'status' => $meeting->status,
                     'actualDurationSeconds' => $meeting->actual_duration_seconds ?? 0,
                     'timerStartedAt' => $meeting->timer_started_at?->toIso8601String(),
@@ -55,6 +56,8 @@ class DashboardController extends Controller
                     'startUrl' => route('meetings.timer.start', $meeting),
                     'stopUrl' => route('meetings.timer.stop', $meeting),
                     'finishUrl' => route('meetings.finish', $meeting),
+                    'closeoutUrl' => route('meetings.closeout', $meeting),
+                    'editUrl' => route('meetings.edit', $meeting),
                 ];
             })
             ->values();
