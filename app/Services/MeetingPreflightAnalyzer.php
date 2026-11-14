@@ -24,6 +24,7 @@ class MeetingPreflightAnalyzer
 
             return [
                 'id' => $user->id,
+                'name' => $user->name ?? 'Participante',
                 'department' => $user->directorate?->name ?? $user->team?->name ?? 'Sem departamento',
                 'position' => $user->jobPosition?->name ?? 'Cargo não informado',
                 'meeting_role' => $data['participant_roles'][$user->id] ?? 'participant',

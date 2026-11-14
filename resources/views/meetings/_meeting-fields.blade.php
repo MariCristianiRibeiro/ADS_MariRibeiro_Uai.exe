@@ -66,11 +66,11 @@
     <div class="grid grid-cols-2 gap-3">
         <div>
             <label for="time" class="block text-sm font-medium text-gray-700">Horário inicial <x-info-tip text="Horário previsto de início." /></label>
-            <input id="time" name="time" type="time" value="{{ old('time', isset($meeting) ? substr((string) $meeting->time, 0, 5) : '') }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+            <input id="time" name="time" type="time" x-on:input="$dispatch('meeting-schedule-changed', { startTime: $event.target.form.querySelector('[name=time]').value, endTime: $event.target.form.querySelector('[name=end_time]').value })" value="{{ old('time', isset($meeting) ? substr((string) $meeting->time, 0, 5) : '') }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
         </div>
         <div>
             <label for="end_time" class="block text-sm font-medium text-gray-700">Horário final <x-info-tip text="Horário previsto de término. Se informado, deve ser posterior ao horário inicial." /></label>
-            <input id="end_time" name="end_time" type="time" value="{{ old('end_time', isset($meeting) ? substr((string) $meeting->end_time, 0, 5) : '') }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+            <input id="end_time" name="end_time" type="time" x-on:input="$dispatch('meeting-schedule-changed', { startTime: $event.target.form.querySelector('[name=time]').value, endTime: $event.target.form.querySelector('[name=end_time]').value })" value="{{ old('end_time', isset($meeting) ? substr((string) $meeting->end_time, 0, 5) : '') }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
         </div>
     </div>
     @error('end_time') <span class="text-sm text-red-600 md:col-span-2">{{ $message }}</span> @enderror

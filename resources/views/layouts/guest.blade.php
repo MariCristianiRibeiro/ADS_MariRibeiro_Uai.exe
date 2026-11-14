@@ -14,17 +14,25 @@
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
-    <body class="font-sans text-gray-900 antialiased">
-        <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-gray-100">
-            <div>
-                <a href="/">
-                    <x-application-logo class="w-20 h-20 fill-current text-gray-500" />
-                </a>
-            </div>
+    <body class="font-sans text-slate-900 antialiased">
+        <main class="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4 py-12 sm:px-6">
+            <div class="pointer-events-none absolute -left-32 -top-32 h-80 w-80 rounded-full bg-teal-100/70 blur-3xl"></div>
+            <div class="pointer-events-none absolute -bottom-40 -right-24 h-96 w-96 rounded-full bg-cyan-100/60 blur-3xl"></div>
 
-            <div class="w-full sm:max-w-md mt-6 px-6 py-4 bg-white shadow-md overflow-hidden sm:rounded-lg">
-                {{ $slot }}
+            <div class="relative w-full max-w-md">
+                <div class="mb-8 flex flex-col items-center gap-3 text-center">
+                    <a href="/" aria-label="Uai - início">
+                        <x-application-logo class="text-5xl text-teal-700" />
+                    </a>
+                    <p class="text-sm font-medium tracking-wide text-slate-500">seu tempo vale muito</p>
+                </div>
+
+                <div class="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xl shadow-slate-200/60 sm:p-9">
+                    {{ $slot }}
+                </div>
+
+                <p class="mt-6 text-center text-xs text-slate-400">Organize sua rotina com mais leveza.</p>
             </div>
-        </div>
+        </main>
     </body>
 </html>

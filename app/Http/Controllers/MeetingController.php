@@ -145,6 +145,7 @@ class MeetingController extends Controller
             'actualDurationSeconds' => $meeting->actual_duration_seconds ?? 0,
             'timerStartedAt' => null,
             'status' => $meeting->status,
+            'redirectUrl' => route('meetings.show', $meeting),
         ]);
     }
 
@@ -236,9 +237,20 @@ class MeetingController extends Controller
 
         $analysis = $analyzer->analyze($validated, $participants);
         $preflightToken = (string) Str::uuid();
+        $aiInputData = $analysis['ai_input_data'];
+        foreach (['participantes', 'historico_semelhante', 'pendencias_relacionadas'] as $key) {
+            $aiInputData[$key] = $aiInputData[$key]->all();
+        }
+        $cachedAnalysis = [
+            'participants' => $analysis['participants']->all(),
+            'ai_input_data' => $aiInputData,
+            'ai_result' => $analysis['ai_result'],
+            'ai_metadata' => $analysis['ai_metadata'],
+            'ai_error' => $analysis['ai_error'],
+        ];
         Cache::put($this->preflightCacheKey($request->user()->id, $preflightToken), [
             'meeting_data' => $validated,
-            'analysis' => $analysis,
+            'analysis' => $cachedAnalysis,
         ], now()->addMinutes(30));
 
         return view('meetings.preview', [
@@ -259,7 +271,12 @@ class MeetingController extends Controller
     public function show(Meeting $meeting, Request $request, MeetingAiService $aiService, MeetingPredictionService $predictions): View
     {
         abort_unless($request->user()->hasPermission('meetings.view'), 403);
-        abort_unless($meeting->user_id === $request->user()->id || $meeting->meetingParticipants()->where('user_id', $request->user()->id)->exists(), 403);
+        abort_unless(
+            $meeting->user_id === $request->user()->id
+                || $meeting->organizer_id === $request->user()->id
+                || $meeting->meetingParticipants()->where('user_id', $request->user()->id)->exists(),
+            403,
+        );
 
         $predictions->generateFor($meeting, $request->user());
 
@@ -338,29 +355,15 @@ class MeetingController extends Controller
             return back()->withErrors(['analysis_notes' => 'Registre as informações da reunião antes de pedir a análise.'])->withInput();
         }
 
-        $meeting->loadMissing(['meetingParticipants.user.jobPosition', 'meetingParticipants.costSnapshot', 'decisions', 'actionItems.responsible', 'actionItems.history', 'conclusion', 'participantFeedback']);
-        $inputData = $this->buildMeetingAnalysisContext($meeting, $stage, (string) ($validated['analysis_notes'] ?? ''));
-        $version = (int) $meeting->analyses()->where('analysis_type', $stage)->max('version') + 1;
-        $analysis = $meeting->analyses()->create([
-            'requested_by' => $request->user()->id,
-            'analysis_type' => $stage,
-            'version' => $version,
-            'prompt_version' => 'meeting-insights-v1',
-            'transcript' => $validated['analysis_notes'] ?? '',
-            'input_data' => $inputData,
-            'provider' => config('services.ai.provider', 'gemini'),
-            'model' => $aiService->configuredModel(),
-            'status' => 'processing',
-        ]);
+        $analysis = $this->generateMeetingAnalysis(
+            $meeting,
+            $request->user()->id,
+            $stage,
+            (string) ($validated['analysis_notes'] ?? ''),
+            $aiService,
+        );
 
-        try {
-            $this->updateAnalysisFromAi($analysis, $aiService->analyze($stage, $inputData));
-        } catch (\Throwable $exception) {
-            $analysis->update([
-                'status' => 'failed',
-                'error_message' => 'A chamada de IA falhou. Verifique conexão, provedor e chave de API.',
-            ]);
-
+        if ($analysis->status === 'failed') {
             return back()->withErrors(['analysis_notes' => 'Nao foi possivel gerar a analise agora. Verifique a configuracao e Tente novamente.'])->withInput();
         }
 
@@ -551,14 +554,21 @@ class MeetingController extends Controller
         return back()->with('success', 'Decisão registrada.');
     }
 
-    public function saveConclusion(Request $request, Meeting $meeting): RedirectResponse
+    public function saveConclusion(
+        Request $request,
+        Meeting $meeting,
+        MeetingAiService $aiService,
+        MeetingPredictionService $predictions,
+    ): RedirectResponse
     {
-        $this->assertCanManageMeeting($request, $meeting);
+        abort_unless($request->user()->hasPermission('meetings.edit'), 403);
+        abort_unless($meeting->organizer_id === $request->user()->id, 403);
+        abort_unless($meeting->status === 'completed', 409, 'Finalize a reunião antes de registrar a conclusão.');
 
         $validated = $request->validate([
-            'summary' => ['nullable', 'string'],
-            'outcome' => ['nullable', 'string'],
-            'objective_achievement' => ['nullable', Rule::in(['yes', 'partially', 'no'])],
+            'summary' => ['required', 'string', 'min:10', 'max:10000'],
+            'outcome' => ['required', 'string', 'min:10', 'max:10000'],
+            'objective_achievement' => ['required', Rule::in(['yes', 'partially', 'no'])],
             'decisions_count' => ['nullable', 'integer', 'min:0'],
             'completed_topics_count' => ['nullable', 'integer', 'min:0'],
             'pending_topics' => ['nullable', 'string'],
@@ -593,7 +603,34 @@ class MeetingController extends Controller
             }
         });
 
-        return back()->with('success', 'Conclusão registrada.');
+        $predictions->evaluatePending($meeting->id);
+
+        if (! $aiService->isConfigured()) {
+            return back()
+                ->with('success', 'Conclusão registrada e dados preservados para análises futuras.')
+                ->with('warning', 'Configure a chave do provedor de IA no servidor para gerar os insights desta reunião.');
+        }
+
+        $analysisNotes = collect([
+            'Resumo informado: '.$validated['summary'],
+            'Resultado obtido: '.$validated['outcome'],
+            filled($validated['pending_topics'] ?? null) ? 'Assuntos pendentes: '.$validated['pending_topics'] : null,
+        ])->filter()->implode("\n\n");
+        $analysis = $this->generateMeetingAnalysis(
+            $meeting,
+            $request->user()->id,
+            'post_meeting',
+            $analysisNotes,
+            $aiService,
+        );
+
+        if ($analysis->status === 'failed') {
+            return back()
+                ->with('success', 'Conclusão registrada e dados preservados para análises futuras.')
+                ->with('warning', 'A conclusão foi salva, mas a análise por IA falhou. Você pode tentar novamente na seção de insights.');
+        }
+
+        return back()->with('success', 'Conclusão registrada e insights gerados. Os dados também serão usados nas análises futuras.');
     }
 
     public function storeParticipantFeedback(Request $request, Meeting $meeting): RedirectResponse
@@ -643,6 +680,50 @@ class MeetingController extends Controller
             'error_message' => $preflight['ai_error'] ?? null,
             'completed_at' => $result === null ? null : now(),
         ]);
+    }
+
+    private function generateMeetingAnalysis(
+        Meeting $meeting,
+        int $userId,
+        string $stage,
+        string $notes,
+        MeetingAiService $aiService,
+    ): MeetingAnalysis {
+        $meeting->loadMissing([
+            'meetingParticipants.user.jobPosition',
+            'meetingParticipants.costSnapshot',
+            'decisions',
+            'actionItems.responsible',
+            'actionItems.history',
+            'conclusion',
+            'participantFeedback',
+            'analyses',
+        ]);
+        $inputData = $this->buildMeetingAnalysisContext($meeting, $stage, $notes);
+        $version = (int) $meeting->analyses()->where('analysis_type', $stage)->max('version') + 1;
+        $analysis = $meeting->analyses()->create([
+            'requested_by' => $userId,
+            'analysis_type' => $stage,
+            'version' => $version,
+            'prompt_version' => 'meeting-insights-v1',
+            'transcript' => $notes,
+            'input_data' => $inputData,
+            'provider' => config('services.ai.provider', 'gemini'),
+            'model' => $aiService->configuredModel(),
+            'status' => 'processing',
+        ]);
+
+        try {
+            $this->updateAnalysisFromAi($analysis, $aiService->analyze($stage, $inputData));
+        } catch (\Throwable $exception) {
+            report($exception);
+            $analysis->update([
+                'status' => 'failed',
+                'error_message' => 'A chamada de IA falhou. Verifique conexão, provedor e chave de API.',
+            ]);
+        }
+
+        return $analysis;
     }
 
     /** @param array<string, mixed> $aiResponse
@@ -735,6 +816,24 @@ class MeetingController extends Controller
                 'objetivo' => $past->objective,
                 'resultado' => $past->conclusion?->outcome ?? $past->conclusion?->summary,
                 'duracao_real_segundos' => $past->actual_duration_seconds,
+                'recorrencia' => [
+                    'tipo' => $past->recurrence_type,
+                    'frequencia' => $past->recurrence_frequency,
+                    'intervalo' => $past->recurrence_interval,
+                ],
+                'fechamento_estruturado' => $past->conclusion?->only([
+                    'objective_achievement',
+                    'objective_changed',
+                    'duration_sufficient',
+                    'time_well_used',
+                    'replaceable_by_email',
+                    'needs_follow_up',
+                    'decisions_count',
+                    'completed_topics_count',
+                    'pending_topics',
+                    'productivity_score',
+                    'investment_return_score',
+                ]),
                 'encaminhamentos_concluidos' => $past->actionItems->where('status', 'completed')->count(),
                 'encaminhamentos_total' => $past->actionItems->count(),
             ]);
@@ -834,7 +933,10 @@ class MeetingController extends Controller
     private function assertCanManageMeeting(Request $request, Meeting $meeting): void
     {
         abort_unless($request->user()->hasPermission('meetings.edit'), 403);
-        abort_unless($meeting->user_id === $request->user()->id, 403);
+        abort_unless(
+            $meeting->user_id === $request->user()->id || $meeting->organizer_id === $request->user()->id,
+            403,
+        );
     }
 
     private function syncParticipants(
@@ -938,7 +1040,15 @@ class MeetingController extends Controller
 
     private function validateMeeting(Request $request): array
     {
-        return $request->validate($this->meetingRules());
+        $validated = $request->validate($this->meetingRules());
+
+        if (filled($validated['time'] ?? null) && filled($validated['end_time'] ?? null)) {
+            [$startHour, $startMinute] = array_map('intval', explode(':', $validated['time']));
+            [$endHour, $endMinute] = array_map('intval', explode(':', $validated['end_time']));
+            $validated['duration_minutes'] = ($endHour * 60 + $endMinute) - ($startHour * 60 + $startMinute);
+        }
+
+        return $validated;
     }
 
     /** @return array<int, int> */

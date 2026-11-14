@@ -83,6 +83,29 @@ it('stores a scheduled meeting, participant roles, and an immutable cost snapsho
     expect((float) $meetingParticipant->fresh()->costSnapshot->hourly_rate)->toBe(125.5);
 });
 
+it('confirms a meeting when the preflight uses the database cache', function () {
+    config(['cache.default' => 'database']);
+
+    [$directorate, $team, $position] = createMeetingOrganization();
+    $owner = createUserWithPermissions(['meetings.view', 'meetings.create']);
+    $attendee = User::factory()->create([
+        'job_position_id' => $position->id,
+        'team_id' => $team->id,
+        'directorate_id' => $directorate->id,
+    ]);
+
+    postMeetingAfterPreview($this, $owner, [
+        'title' => 'Reunião com cache de banco',
+        'date' => '2026-12-02',
+        'participants' => [$attendee->id],
+    ])->assertRedirect(route('meetings.index'));
+
+    $this->assertDatabaseHas('meetings', [
+        'user_id' => $owner->id,
+        'title' => 'Reunião com cache de banco',
+    ]);
+});
+
 it('records schedule changes and cancellation without deleting the meeting', function () {
     $owner = createUserWithPermissions(['meetings.view', 'meetings.create', 'meetings.edit', 'meetings.delete']);
     $meeting = Meeting::create([
@@ -169,10 +192,12 @@ it('tracks action dependencies, decisions, and conclusion against the meeting', 
         'decided_by' => $attendee->id,
     ])->assertRedirect();
 
+    config(['services.ai.providers.gemini.api_key' => null]);
     $this->actingAs($owner)->put(route('meetings.conclusion.save', $meeting), [
         'summary' => 'Reunião concluída.',
         'outcome' => 'Plano aprovado e distribuído.',
-    ])->assertRedirect();
+        'objective_achievement' => 'yes',
+    ])->assertRedirect()->assertSessionHas('warning');
 
     expect($actionItem->fresh()->status)->toBe('completed')
         ->and($actionItem->fresh()->completed_at)->not->toBeNull()

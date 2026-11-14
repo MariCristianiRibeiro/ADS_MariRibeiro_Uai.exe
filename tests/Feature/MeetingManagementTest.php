@@ -117,6 +117,37 @@ it('starts and pauses a meeting timer while persisting its elapsed time', functi
     $this->travelBack();
 });
 
+it('accumulates separate running intervals when a meeting timer is paused and resumed', function () {
+    $owner = createUserWithPermissions(['meetings.view', 'meetings.edit']);
+    $meeting = Meeting::create([
+        'user_id' => $owner->id,
+        'title' => 'Reunião com pausa',
+        'date' => '2026-10-16',
+        'status' => 'scheduled',
+    ]);
+
+    $this->travelTo('2026-10-16 10:00:00');
+    $this->actingAs($owner)->postJson(route('meetings.timer.start', $meeting))->assertOk();
+    $this->travel(75)->seconds();
+    $this->actingAs($owner)->postJson(route('meetings.timer.stop', $meeting))
+        ->assertOk()
+        ->assertJsonPath('actualDurationSeconds', 75);
+
+    $this->actingAs($owner)->postJson(route('meetings.timer.start', $meeting))->assertOk();
+    $this->travel(45)->seconds();
+    $this->actingAs($owner)->postJson(route('meetings.timer.stop', $meeting))
+        ->assertOk()
+        ->assertJsonPath('actualDurationSeconds', 120);
+
+    $this->assertDatabaseHas('meetings', [
+        'id' => $meeting->id,
+        'actual_duration_seconds' => 120,
+        'timer_started_at' => null,
+    ]);
+
+    $this->travelBack();
+});
+
 it('finishes a running meeting, saves its final time and includes the final cost in reports', function () {
     $this->travelTo('2026-10-16 10:00:00');
 
@@ -141,7 +172,8 @@ it('finishes a running meeting, saves its final time and includes the final cost
         ->assertOk()
         ->assertJsonPath('actualDurationSeconds', 90)
         ->assertJsonPath('timerStartedAt', null)
-        ->assertJsonPath('status', 'completed');
+        ->assertJsonPath('status', 'completed')
+        ->assertJsonPath('redirectUrl', route('meetings.show', $meeting));
 
     $this->assertDatabaseHas('meetings', [
         'id' => $meeting->id,
@@ -260,6 +292,44 @@ it('user can create a meeting', function () {
         'location' => 'Sala 2',
         'status' => 'scheduled',
     ]);
+});
+
+it('derives planned meeting duration from its start and end times', function () {
+    $user = createUserWithPermissions(['meetings.view', 'meetings.create']);
+
+    postMeetingAfterPreview($this, $user, [
+        'title' => 'Reunião de quinze minutos',
+        'date' => '2026-09-10',
+        'time' => '21:45',
+        'end_time' => '22:00',
+        'duration_minutes' => 60,
+    ])->assertRedirect('/meetings');
+
+    $this->assertDatabaseHas('meetings', [
+        'user_id' => $user->id,
+        'title' => 'Reunião de quinze minutos',
+        'duration_minutes' => 15,
+    ]);
+});
+
+it('includes participant names in the preflight preview', function () {
+    $user = createUserWithPermissions(['meetings.view', 'meetings.create', 'reports.costs']);
+    $attendee = User::factory()->create(['name' => 'Ana Souza', 'role' => 'participant']);
+
+    $this->actingAs($user)
+        ->post(route('meetings.preview'), [
+            'title' => 'Reunião de revisão',
+            'date' => '2026-09-10',
+            'duration_minutes' => 60,
+            'participants' => [$attendee->id],
+            'participant_roles' => [$attendee->id => 'participant'],
+            'organizer_id' => $user->id,
+            'priority' => 'normal',
+            'recurrence_type' => 'single',
+            'status' => 'scheduled',
+        ])
+        ->assertOk()
+        ->assertSee('Ana Souza');
 });
 
 it('stores actual meeting time and attendance confirmation separately from planned time', function () {

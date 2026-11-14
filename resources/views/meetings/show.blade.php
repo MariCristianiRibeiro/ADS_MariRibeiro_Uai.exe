@@ -2,13 +2,17 @@
     <x-slot name="header">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div><p class="text-xs font-semibold uppercase tracking-wider text-teal-700">{{ $meeting->category ?: 'Reunião' }}</p><h2 class="mt-1 text-xl font-semibold text-gray-800">{{ $meeting->title }}</h2></div>
-            <a href="{{ route('meetings.edit', $meeting) }}" class="rounded-md bg-gray-800 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white">Editar reunião</a>
+            @if (auth()->id() === $meeting->user_id)
+                <a href="{{ route('meetings.edit', $meeting) }}" class="rounded-md bg-gray-800 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white">Editar reunião</a>
+            @endif
         </div>
     </x-slot>
 
     <div class="py-6">
         <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
             @if (session('success')) <div class="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-green-800">{{ session('success') }}</div> @endif
+            @if (session('warning')) <div class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">{{ session('warning') }}</div> @endif
+            @if (session('warning')) <div class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">{{ session('warning') }}</div> @endif
             @if ($errors->any()) <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-800"><p class="font-semibold">Revise os campos informados.</p><ul class="mt-2 list-inside list-disc">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div> @endif
 
             <section class="grid gap-6 lg:grid-cols-3">
@@ -112,11 +116,13 @@
                 <div class="rounded-lg bg-white p-5 shadow-sm">
                     <h3 class="font-semibold text-gray-900">Conclusão</h3>
                     @if ($meeting->conclusion)<p class="mt-2 text-xs text-gray-500">Registrada por {{ $meeting->conclusion->recorder?->name ?? 'usuário removido' }} · {{ $meeting->conclusion->concluded_at?->format('d/m/Y H:i') }}</p>@endif
+                    @if ($meeting->status === 'completed' && auth()->id() === $meeting->organizer_id && auth()->user()->can('meetings.edit'))
                     <form method="POST" action="{{ route('meetings.conclusion.save', $meeting) }}" class="mt-3 space-y-3">@csrf @method('PUT')
-                        <label class="block text-sm font-medium text-gray-700">Resumo<textarea name="summary" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">{{ old('summary', $meeting->conclusion?->summary) }}</textarea></label>
-                        <label class="block text-sm font-medium text-gray-700">Resultado obtido<textarea name="outcome" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">{{ old('outcome', $meeting->conclusion?->outcome) }}</textarea></label>
+                        <p class="text-sm text-gray-600">Informe o resultado real. Esses dados serão preservados para os insights da IA e análises futuras, incluindo reuniões recorrentes.</p>
+                        <label class="block text-sm font-medium text-gray-700">Resumo<textarea name="summary" required minlength="10" maxlength="10000" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">{{ old('summary', $meeting->conclusion?->summary) }}</textarea></label>
+                        <label class="block text-sm font-medium text-gray-700">Resultado obtido<textarea name="outcome" required minlength="10" maxlength="10000" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">{{ old('outcome', $meeting->conclusion?->outcome) }}</textarea></label>
                         <div class="grid gap-3 sm:grid-cols-2">
-                            <label class="text-sm font-medium text-gray-700">Objetivo alcançado<select name="objective_achievement" class="mt-1 block w-full rounded-md border-gray-300"><option value="">Selecione</option>@foreach (['yes' => 'Sim', 'partially' => 'Parcialmente', 'no' => 'Não'] as $value => $label)<option value="{{ $value }}" @selected(old('objective_achievement', $meeting->conclusion?->objective_achievement) === $value)>{{ $label }}</option>@endforeach</select></label>
+                            <label class="text-sm font-medium text-gray-700">Objetivo alcançado<select name="objective_achievement" required class="mt-1 block w-full rounded-md border-gray-300"><option value="">Selecione</option>@foreach (['yes' => 'Sim', 'partially' => 'Parcialmente', 'no' => 'Não'] as $value => $label)<option value="{{ $value }}" @selected(old('objective_achievement', $meeting->conclusion?->objective_achievement) === $value)>{{ $label }}</option>@endforeach</select></label>
                             <label class="text-sm font-medium text-gray-700">Decisões tomadas<input type="number" min="0" name="decisions_count" value="{{ old('decisions_count', $meeting->conclusion?->decisions_count ?? 0) }}" class="mt-1 block w-full rounded-md border-gray-300"></label>
                             <label class="text-sm font-medium text-gray-700">Assuntos concluídos<input type="number" min="0" name="completed_topics_count" value="{{ old('completed_topics_count', $meeting->conclusion?->completed_topics_count ?? 0) }}" class="mt-1 block w-full rounded-md border-gray-300"></label>
                             <label class="text-sm font-medium text-gray-700">Produtividade (1–5)<input type="number" min="1" max="5" name="productivity_score" value="{{ old('productivity_score', $meeting->conclusion?->productivity_score) }}" class="mt-1 block w-full rounded-md border-gray-300"></label>
@@ -129,8 +135,21 @@
                                 @foreach ($meeting->meetingParticipants as $participant)<div class="grid gap-2 border-b py-3 last:border-0 sm:grid-cols-2"><p class="text-sm font-medium text-gray-700 sm:col-span-2">{{ $participant->user?->name }} · Presença: {{ $participant->attendance_status }}</p><label class="text-xs text-gray-600">Presença<select name="participation[{{ $participant->id }}][attendance_status]" class="mt-1 block w-full rounded-md border-gray-300"><option value="pending" @selected($participant->attendance_status === "pending")>Pendente</option><option value="present" @selected($participant->attendance_status === "present")>Presente</option><option value="absent" @selected($participant->attendance_status === "absent")>Ausente</option></select></label>@foreach (['participation_effective' => 'Participação efetiva?', 'relevant_contribution' => 'Contribuição relevante?', 'contributed_to_decision' => 'Contribuiu para decisões?', 'participation_necessary' => 'Participação necessária?'] as $field => $label)<label class="text-xs text-gray-600">{{ $label }}<select name="participation[{{ $participant->id }}][{{ $field }}]" class="mt-1 block w-full rounded-md border-gray-300"><option value="">Não informado</option><option value="1" @selected((string) old("participation.{$participant->id}.{$field}", $participant->{$field}) === '1')>Sim</option><option value="0" @selected((string) old("participation.{$participant->id}.{$field}", $participant->{$field}) === '0')>Não</option></select></label>@endforeach<label class="text-xs text-gray-600">Autoavaliação opcional (1–5)<input type="number" min="1" max="5" name="participation[{{ $participant->id }}][self_rating]" value="{{ old("participation.{$participant->id}.self_rating", $participant->self_rating) }}" class="mt-1 block w-full rounded-md border-gray-300"></label></div>@endforeach
                             </fieldset>
                         @endif
-                        @can('meetings.edit')<button class="rounded-md bg-gray-800 px-3 py-2 text-xs font-semibold uppercase text-white">Salvar conclusão</button>@endcan
+                        <button class="rounded-md bg-teal-700 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white">Salvar conclusão e gerar insights</button>
                     </form>
+                    @else
+                        @if ($meeting->conclusion)
+                            <p class="mt-3 text-sm text-gray-700"><strong>Resumo:</strong> {{ $meeting->conclusion->summary }}</p>
+                            <p class="mt-2 text-sm text-gray-700"><strong>Resultado:</strong> {{ $meeting->conclusion->outcome }}</p>
+                        @endif
+                        @if ($meeting->status !== 'completed')
+                            <p class="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800">Finalize o cronômetro para liberar o registro da conclusão.</p>
+                        @elseif (auth()->id() !== $meeting->organizer_id)
+                            <p class="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800">O organizador da reunião deve preencher e salvar a conclusão.</p>
+                        @else
+                            <p class="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800">Você precisa da permissão de edição de reuniões para registrar a conclusão.</p>
+                        @endif
+                    @endif
                 </div>
             </section>
 

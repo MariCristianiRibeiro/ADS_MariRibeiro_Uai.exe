@@ -1,3 +1,5 @@
+const ATTENDED_STATUSES = new Set(['confirmed', 'present']);
+
 export default (meetings = [], initialMeetingId = null) => ({
     meetings,
     selectedMeetingId: Number(initialMeetingId || meetings[0]?.id || 0),
@@ -44,13 +46,13 @@ export default (meetings = [], initialMeetingId = null) => ({
         return Number(meeting.actualDurationSeconds || 0) + runningSeconds;
     },
 
-    get confirmedAttendeesCount() {
-        return this.selectedMeeting?.attendees.filter((attendee) => attendee.attendanceStatus === 'confirmed').length ?? 0;
+    get attendedCount() {
+        return this.selectedMeeting?.attendees.filter((attendee) => ATTENDED_STATUSES.has(attendee.attendanceStatus)).length ?? 0;
     },
 
     get investedValue() {
         const confirmedHourlyRate = this.selectedMeeting?.attendees.reduce(
-            (total, attendee) => total + (attendee.attendanceStatus === 'confirmed' ? Number(attendee.hourlyRate) : 0),
+            (total, attendee) => total + (ATTENDED_STATUSES.has(attendee.attendanceStatus) ? Number(attendee.hourlyRate) : 0),
             0,
         ) ?? 0;
 
@@ -112,6 +114,7 @@ export default (meetings = [], initialMeetingId = null) => ({
             this.selectedMeeting.timerStartedAt = null;
             this.selectedMeeting.status = response.status;
             this.stopTicking();
+            window.location.assign(response.redirectUrl);
         } catch (error) {
             this.error = error instanceof Error ? error.message : 'Não foi possível finalizar a reunião.';
         } finally {

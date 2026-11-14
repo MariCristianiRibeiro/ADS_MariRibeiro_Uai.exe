@@ -4,8 +4,7 @@
             <div class="mb-10 flex flex-col justify-between gap-5 md:flex-row md:items-end">
                 <div>
                     <p class="dashboard-kicker">Central de reuniões</p>
-                    <h1 class="dashboard-title">Quanto custa uma conversa bem conduzida?</h1>
-                    <p class="mt-3 max-w-2xl text-base leading-7 text-slate-600">Faça uma estimativa rápida do investimento da sua próxima reunião e decida com mais clareza.</p>
+                    <h1 class="dashboard-title">Seu tempo vale muito</h1>
                 </div>
                 <a href="{{ route('meetings.create') }}" class="dashboard-action">+ Agendar reunião</a>
             </div>
@@ -39,7 +38,7 @@
                                     <span x-text="isRunning ? 'Reunião em andamento' : selectedMeeting?.status === 'completed' ? 'Reunião finalizada' : 'Cronômetro'"></span>
                                 </div>
                                 <p class="mt-3 font-mono text-5xl font-bold tabular-nums tracking-tight text-white sm:text-6xl lg:text-7xl" aria-live="off" x-text="formatTime()">00:00:00</p>
-                                <p class="mt-2 text-sm text-slate-400"><span x-text="confirmedAttendeesCount"></span> participante(s) com presença confirmada</p>
+                                <p class="mt-2 text-sm text-slate-400"><span x-text="attendedCount"></span> participante(s) com presença contabilizada</p>
                             </div>
                             @if ($canViewCosts)
                                 <div class="rounded-lg border border-white/10 bg-white/5 p-5 sm:text-right">
@@ -72,14 +71,13 @@
                 @endif
             </section>
 
-            <div class="grid gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(20rem,0.75fr)]">
+            <div class="grid gap-6">
                 <section class="calculator-panel" aria-labelledby="calculator-title">
                     <div class="flex items-start justify-between gap-4">
                         <div>
                             <p class="panel-overline">Calculadora rápida</p>
                             <h2 id="calculator-title" class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Custo da reunião</h2>
                         </div>
-                        <div class="calculator-mark" aria-hidden="true">∑</div>
                     </div>
 
                     <div class="mt-9 grid gap-5 sm:grid-cols-3">
@@ -91,16 +89,18 @@
                     <div class="mt-9 border-t border-slate-200 pt-7">
                         <div class="flex flex-wrap items-end justify-between gap-4">
                             <div><p class="text-sm font-medium text-slate-500">Investimento estimado</p><p class="mt-1 text-5xl font-semibold tracking-tight text-slate-950" x-text="new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((duration / 60) * people * rate)"></p></div>
-                            <p class="rounded-full bg-amber-100 px-3 py-1.5 text-sm font-semibold text-amber-800"><span x-text="(duration / 60).toFixed(1).replace('.', ',')"></span>h × <span x-text="people"></span> pessoas</p>
                         </div>
                         <div class="mt-7 h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-gradient-to-r from-teal-400 via-cyan-500 to-blue-600 transition-all duration-300" :style="`width: ${Math.min(100, Math.max(8, duration / 7.2))}%`"></div></div>
                     </div>
                 </section>
 
                 <aside class="summary-panel">
-                    <div class="flex items-center justify-between"><p class="panel-overline text-teal-100">Seu painel hoje</p><span class="live-dot">ao vivo</span></div>
-                    <div class="mt-10"><p class="text-sm text-teal-100">Participantes ativos</p><p class="mt-2 text-6xl font-semibold tracking-tight text-white">{{ $activeParticipantsCount }}</p></div>
-                    <div class="mt-10 grid grid-cols-2 gap-4 border-t border-white/15 pt-5"><div><p class="text-xs text-teal-100">Usuários</p><p class="mt-1 text-2xl font-semibold text-white">{{ $usersCount }}</p></div><div><p class="text-xs text-teal-100">Participantes</p><p class="mt-1 text-2xl font-semibold text-white">{{ $participantsCount }}</p></div></div>
+                    <div class="flex items-center justify-between"><p class="panel-overline text-teal-100">Seu painel hoje</p></div>
+                    <div class="mt-8 grid gap-6 sm:grid-cols-3 sm:items-end">
+                        <div><p class="text-sm text-teal-100">Participantes ativos</p><p class="mt-2 text-6xl font-semibold tracking-tight text-white">{{ $activeParticipantsCount }}</p></div>
+                        <div class="border-t border-white/15 pt-4 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0"><p class="text-xs text-teal-100">Usuários</p><p class="mt-1 text-2xl font-semibold text-white">{{ $usersCount }}</p></div>
+                        <div class="border-t border-white/15 pt-4 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0"><p class="text-xs text-teal-100">Participantes</p><p class="mt-1 text-2xl font-semibold text-white">{{ $participantsCount }}</p></div>
+                    </div>
                 </aside>
             </div>
 

@@ -8,8 +8,35 @@ use App\Models\MeetingParticipantFeedback;
 use Illuminate\Support\Facades\Http;
 
 it('stores the structured meeting outcome and contextual participant observations', function () {
+    config(['services.ai.providers.gemini.api_key' => 'test-api-key']);
+    Http::preventStrayRequests();
+    Http::fake(['generativelanguage.googleapis.com/*' => Http::response([
+        'candidates' => [['content' => ['parts' => [['text' => json_encode([
+            'summary' => 'A reunião atingiu parcialmente o objetivo.', 'findings' => ['Há assuntos pendentes.'],
+            'recommendations' => [], 'risks' => [], 'opportunities' => [], 'missing_information' => [],
+            'confidence' => 0.8, 'historical_basis' => [], 'suggested_next_steps' => [],
+        ], JSON_THROW_ON_ERROR)]]]]],
+    ])]);
     $owner = createUserWithPermissions(['meetings.view', 'meetings.edit']);
     $participantUser = createUserWithPermissions(['meetings.view']);
+    $historicalMeeting = Meeting::create([
+        'user_id' => $owner->id,
+        'organizer_id' => $owner->id,
+        'title' => 'Revisão trimestral',
+        'date' => '2026-11-08',
+        'duration_minutes' => 60,
+        'status' => 'completed',
+        'recurrence_type' => 'recurring',
+        'recurrence_frequency' => 'monthly',
+    ]);
+    $historicalMeeting->conclusion()->create([
+        'recorded_by' => $owner->id,
+        'summary' => 'Resultados trimestrais registrados.',
+        'outcome' => 'Metas trimestrais atingidas.',
+        'objective_achievement' => 'yes',
+        'productivity_score' => 5,
+        'concluded_at' => now(),
+    ]);
     $meeting = Meeting::create(['user_id' => $owner->id, 'organizer_id' => $owner->id, 'title' => 'Revisão trimestral', 'date' => '2026-11-09', 'duration_minutes' => 60, 'status' => 'completed']);
     $participant = MeetingParticipant::create(['meeting_id' => $meeting->id, 'user_id' => $participantUser->id, 'attendance_status' => 'present']);
 
@@ -20,6 +47,13 @@ it('stores the structured meeting outcome and contextual participant observation
         'needs_follow_up' => 1, 'productivity_score' => 4, 'investment_return_score' => 3,
         'participation' => [$participant->id => ['participation_effective' => 1, 'relevant_contribution' => 1, 'contributed_to_decision' => 0, 'participation_necessary' => 1, 'self_rating' => 4]],
     ])->assertRedirect()->assertSessionHasNoErrors();
+
+    $analysis = MeetingAnalysis::query()->where('analysis_type', 'post_meeting')->firstOrFail();
+    expect($analysis->status)->toBe('completed')
+        ->and($analysis->input_data['resultado_informado']['assuntos_pendentes'])->toBe('Aprovar orçamento')
+        ->and($analysis->input_data['historico_relacionado_acessivel'][0]['recorrencia']['frequencia'])->toBe('monthly')
+        ->and($analysis->input_data['historico_relacionado_acessivel'][0]['fechamento_estruturado']['productivity_score'])->toBe(5);
+    Http::assertSent(fn ($request): bool => str_contains($request->url(), 'generateContent'));
 
     $this->actingAs($participantUser)->put(route('meetings.participant-feedback.save', $meeting), [
         'clarity_score' => 5, 'objectivity_score' => 4, 'organization_score' => 4, 'time_management_score' => 3,
@@ -32,7 +66,90 @@ it('stores the structured meeting outcome and contextual participant observation
         ->and(MeetingParticipantFeedback::query()->where('meeting_id', $meeting->id)->count())->toBe(1);
 });
 
+it('allows only the meeting organizer to record a conclusion after the timer is finished', function () {
+    config(['services.ai.providers.gemini.api_key' => null]);
+    Http::preventStrayRequests();
+    $owner = createUserWithPermissions(['meetings.view', 'meetings.edit']);
+    $organizer = createUserWithPermissions(['meetings.view', 'meetings.edit']);
+    $meeting = Meeting::create([
+        'user_id' => $owner->id,
+        'organizer_id' => $organizer->id,
+        'title' => 'Revisão de resultados',
+        'date' => '2026-11-09',
+        'duration_minutes' => 60,
+        'status' => 'completed',
+    ]);
+    $conclusion = [
+        'summary' => 'A pauta foi revisada com a equipe.',
+        'outcome' => 'O cronograma foi aprovado pela equipe.',
+        'objective_achievement' => 'yes',
+    ];
+
+    $this->actingAs($owner)
+        ->put(route('meetings.conclusion.save', $meeting), $conclusion)
+        ->assertForbidden();
+
+    $this->actingAs($organizer)
+        ->get(route('meetings.show', $meeting))
+        ->assertOk()
+        ->assertSee('Salvar conclusão e gerar insights');
+
+    $this->actingAs($organizer)
+        ->put(route('meetings.conclusion.save', $meeting), $conclusion)
+        ->assertRedirect()
+        ->assertSessionHas('warning');
+
+    expect($meeting->fresh()->conclusion->outcome)->toBe($conclusion['outcome']);
+});
+
+it('preserves the conclusion when automatic AI analysis fails', function () {
+    config(['services.ai.providers.gemini.api_key' => 'test-api-key']);
+    Http::preventStrayRequests();
+    Http::fake(['generativelanguage.googleapis.com/*' => Http::response([], 503)]);
+    $owner = createUserWithPermissions(['meetings.view', 'meetings.edit']);
+    $meeting = Meeting::create([
+        'user_id' => $owner->id,
+        'organizer_id' => $owner->id,
+        'title' => 'Reunião de acompanhamento',
+        'date' => '2026-11-09',
+        'duration_minutes' => 30,
+        'status' => 'completed',
+    ]);
+
+    $this->actingAs($owner)->put(route('meetings.conclusion.save', $meeting), [
+        'summary' => 'Os principais pontos foram revisados.',
+        'outcome' => 'A equipe definiu as próximas ações.',
+        'objective_achievement' => 'partially',
+    ])->assertRedirect()->assertSessionHas('warning');
+
+    expect($meeting->fresh()->conclusion->outcome)->toBe('A equipe definiu as próximas ações.')
+        ->and(MeetingAnalysis::query()->where('analysis_type', 'post_meeting')->firstOrFail()->status)->toBe('failed');
+});
+
+it('does not allow recording a conclusion before the meeting is completed', function () {
+    config(['services.ai.providers.gemini.api_key' => null]);
+    $owner = createUserWithPermissions(['meetings.view', 'meetings.edit']);
+    $meeting = Meeting::create([
+        'user_id' => $owner->id,
+        'organizer_id' => $owner->id,
+        'title' => 'Reunião em andamento',
+        'date' => '2026-11-09',
+        'duration_minutes' => 30,
+        'status' => 'ongoing',
+    ]);
+
+    $this->actingAs($owner)->put(route('meetings.conclusion.save', $meeting), [
+        'summary' => 'Os principais pontos foram revisados.',
+        'outcome' => 'A equipe definiu as próximas ações.',
+        'objective_achievement' => 'partially',
+    ])->assertStatus(409);
+
+    expect($meeting->fresh()->conclusion)->toBeNull();
+});
+
 it('preserves each action item change including completion, lateness, and reopening', function () {
+    config(['services.ai.providers.gemini.api_key' => null]);
+    Http::preventStrayRequests();
     $owner = createUserWithPermissions(['meetings.view', 'meetings.edit']);
     $meeting = Meeting::create(['user_id' => $owner->id, 'organizer_id' => $owner->id, 'title' => 'Reunião de projeto', 'date' => '2026-11-09', 'duration_minutes' => 45, 'status' => 'completed']);
     $action = MeetingActionItem::create(['meeting_id' => $meeting->id, 'title' => 'Entregar relatório', 'description' => 'Consolidar dados.', 'due_date' => now()->subDay()->toDateString(), 'status' => 'open']);

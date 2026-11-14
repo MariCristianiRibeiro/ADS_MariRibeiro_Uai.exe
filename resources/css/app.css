@@ -5,6 +5,7 @@
 @layer base {
 	:root { --ink: #0f172a; --mist: #f4f7f6; --teal: #0f766e; }
 	body { background: var(--mist); color: var(--ink); }
+	[x-cloak] { display: none !important; }
 }
 
 @layer components {
