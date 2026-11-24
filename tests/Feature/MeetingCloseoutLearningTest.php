@@ -209,3 +209,49 @@ it('renders the closeout and learning history for a completed meeting', function
         ->assertSee('Plano validado')
         ->assertSee('Gerar análise complementar');
 });
+
+it('shows only upcoming scheduled meetings in the follow-up meeting selector', function () {
+    $this->travelTo('2026-11-14 14:00:00');
+    $owner = createUserWithPermissions(['meetings.view', 'meetings.edit']);
+    $meeting = Meeting::create([
+        'user_id' => $owner->id,
+        'organizer_id' => $owner->id,
+        'title' => 'Reunião já concluída',
+        'date' => '2026-11-10',
+        'status' => 'completed',
+    ]);
+    MeetingActionItem::create([
+        'meeting_id' => $meeting->id,
+        'title' => 'Acompanhar próxima etapa',
+        'description' => 'Revisar o andamento da entrega.',
+        'status' => 'open',
+    ]);
+
+    foreach ([
+        ['title' => 'Agenda de amanhã', 'date' => '2026-11-15', 'time' => '09:00', 'status' => 'scheduled'],
+        ['title' => 'Agenda de hoje mais tarde', 'date' => '2026-11-14', 'time' => '12:00', 'status' => 'scheduled'],
+        ['title' => 'Agenda de hoje sem horário', 'date' => '2026-11-14', 'time' => null, 'status' => 'scheduled'],
+        ['title' => 'Agenda com data passada', 'date' => '2026-11-13', 'time' => '09:00', 'status' => 'scheduled'],
+        ['title' => 'Agenda de hoje com horário passado', 'date' => '2026-11-14', 'time' => '10:00', 'status' => 'scheduled'],
+        ['title' => 'Agenda futura concluída', 'date' => '2026-11-15', 'time' => '10:00', 'status' => 'completed'],
+    ] as $agenda) {
+        Meeting::create([
+            'user_id' => $owner->id,
+            'organizer_id' => $owner->id,
+            'duration_minutes' => 30,
+            ...$agenda,
+        ]);
+    }
+
+    $this->actingAs($owner)
+        ->get(route('meetings.show', $meeting))
+        ->assertOk()
+        ->assertSee('Agenda de amanhã')
+        ->assertSee('Agenda de hoje mais tarde')
+        ->assertSee('Agenda de hoje sem horário')
+        ->assertDontSee('Agenda com data passada')
+        ->assertSee('Agenda de hoje com horário passado')
+        ->assertDontSee('Agenda futura concluída');
+
+    $this->travelBack();
+});

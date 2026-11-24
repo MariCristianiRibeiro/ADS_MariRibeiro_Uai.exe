@@ -11,6 +11,129 @@
 
     <div class="py-6">
         <div class="max-w-6xl mx-auto space-y-6 px-4 sm:px-6 lg:px-8">
+            @if (($analysis['ai_result'] ?? null) && ($analysis['ai_generated'] ?? false))
+                @php
+                    $aiResult = $analysis['ai_result'];
+                @endphp
+                <section class="rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 via-white to-indigo-50 p-5 shadow-sm sm:p-6">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Insights da IA</p>
+                            <h3 class="mt-1 text-xl font-bold text-gray-900">Resumo executivo da agenda</h3>
+                        </div>
+                        <span class="rounded-full bg-indigo-700 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">IA em destaque</span>
+                    </div>
+
+                    <p class="mt-4 text-base font-medium leading-6 text-gray-800">{{ $aiResult['summary'] }}</p>
+
+                    @can('view-costs')
+                        <div class="mt-4">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Simulações calculadas pelo sistema e contextualizadas pela IA</p>
+                            <div class="mt-2 grid gap-3 md:grid-cols-3">
+                                <article class="rounded-lg border border-amber-200 bg-white/80 p-4">
+                                    <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Mais 2 agendas iguais</p>
+                                    <p class="mt-2 text-2xl font-bold text-amber-800">R$ {{ number_format($analysis['two_additional_meetings_cost'], 2, ',', '.') }}</p>
+                                </article>
+                                <article class="rounded-lg border border-indigo-200 bg-indigo-50/70 p-4">
+                                    <p class="text-[11px] font-semibold uppercase tracking-wide text-indigo-700">3 agendas no total</p>
+                                    <p class="mt-2 text-2xl font-bold text-indigo-900">R$ {{ number_format($analysis['three_meetings_cost'], 2, ',', '.') }}</p>
+                                </article>
+                                <article class="rounded-lg border border-emerald-200 bg-emerald-50/80 p-4">
+                                    <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-800">Economia estimada ao reduzir 1 participante</p>
+                                    <p class="mt-2 text-2xl font-bold text-emerald-900">R$ {{ number_format($analysis['participant_savings'], 2, ',', '.') }} <span class="text-xs font-medium">por agenda</span></p>
+                                </article>
+                            </div>
+                            <p class="mt-2 text-xs text-gray-500">Valores financeiros são estimativas do sistema. A possível redução considera o menor custo/hora entre os participantes e não substitui a avaliação de quem é essencial para a decisão.</p>
+                        </div>
+                    @endcan
+
+                    @if (! empty($aiResult['recommendations']))
+                        <div class="mt-4 space-y-3">
+                            <h4 class="text-xs font-semibold uppercase tracking-wide text-indigo-700">Recomendações da IA com base nesta agenda</h4>
+                            @foreach ($aiResult['recommendations'] as $recommendation)
+                                <article class="rounded-lg border border-indigo-100 bg-white/80 p-4">
+                                    <h5 class="text-sm font-semibold text-gray-900">{{ $recommendation['title'] }}</h5>
+                                    <p class="mt-1 text-sm text-gray-700">{{ $recommendation['detail'] }}</p>
+                                    <p class="mt-1 text-xs text-gray-500">{{ $recommendation['justification'] }}</p>
+                                </article>
+                            @endforeach
+                        </div>
+                    @endif
+                </section>
+            @endif
+
+            <section class="rounded-xl border-2 border-indigo-300 bg-indigo-50 p-6 shadow-sm sm:p-8">
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                        <p class="text-sm font-bold uppercase tracking-wide text-indigo-700">Análise inteligente da agenda</p>
+                        <h3 class="mt-1 text-2xl font-bold text-indigo-950">
+                            Insights do {{ $analysis['ai_metadata']['provider'] ?? 'Gemini' }}
+                        </h3>
+                        <p class="mt-2 max-w-3xl text-sm text-indigo-900">
+                            @if ($analysis['ai_generated'])
+                                Esta resposta foi gerada pela interação com {{ strtoupper($analysis['ai_metadata']['provider']) }} / {{ $analysis['ai_metadata']['model'] }}. O modelo recebeu os dados da agenda; os valores financeiros exibidos são calculados pelo sistema.
+                            @else
+                                Não foi possível obter uma resposta da IA: {{ $analysis['ai_error'] }} Configure o Gemini e tente analisar novamente. Nenhum insight automático foi inventado.
+                            @endif
+                        </p>
+                    </div>
+                    @if ($analysis['ai_generated'])
+                        <span class="rounded-full bg-indigo-700 px-3 py-1 text-xs font-semibold text-white">Resposta real da IA</span>
+                    @endif
+                </div>
+
+                @if ($analysis['ai_result'])
+                    @php
+                        $aiResult = $analysis['ai_result'];
+                    @endphp
+                    <div class="mt-6 space-y-4 rounded-lg bg-white p-5 shadow-sm">
+                        <p class="text-base font-semibold leading-relaxed text-gray-900">{{ $aiResult['summary'] }}</p>
+                        <div class="grid gap-4 md:grid-cols-2">
+                            @foreach (['findings' => 'Constatações', 'recommendations' => 'Recomendações', 'risks' => 'Riscos', 'opportunities' => 'Oportunidades', 'missing_information' => 'Informações ausentes', 'historical_basis' => 'Base histórica', 'suggested_next_steps' => 'Próximos passos sugeridos'] as $key => $label)
+                                @if (! empty($aiResult[$key]))
+                                    <div>
+                                        <h4 class="text-xs font-semibold uppercase tracking-wide text-indigo-700">{{ $label }}</h4>
+                                        <ul class="mt-1 list-inside list-disc space-y-1 text-sm text-gray-700">
+                                            @foreach ($aiResult[$key] as $item)
+                                                <li>@if (is_array($item))<strong>{{ $item['title'] }}</strong>: {{ $item['detail'] }} <span class="text-gray-500">{{ $item['justification'] }}</span>@else{{ $item }}@endif</li>
+                                            @endforeach
+                                        </ul>
+                                    </div>
+                                @endif
+                            @endforeach
+                        </div>
+                        <p class="text-xs text-gray-500">Confiança informada pelo modelo: {{ number_format((float) $aiResult['confidence'] * 100, 0, ',', '.') }}% · Gerada em {{ now()->format('d/m/Y H:i') }}.</p>
+                        <details class="text-xs text-gray-500"><summary class="cursor-pointer">Dados enviados para a IA</summary><pre class="mt-2 whitespace-pre-wrap">{{ json_encode($analysis['ai_input_data'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre></details>
+                        @if (filled($analysis['ai_metadata']['usage']['total_tokens'] ?? null))
+                            <p class="text-xs text-gray-500">Consumo registrado pelo provedor: {{ $analysis['ai_metadata']['usage']['total_tokens'] }} tokens totais.</p>
+                        @endif
+                        @if (is_numeric($analysis['ai_metadata']['usage']['cost'] ?? null))
+                            <p class="text-xs text-gray-500">Custo de IA informado pelo provedor: {{ number_format((float) $analysis['ai_metadata']['usage']['cost'], 6) }} ({{ $analysis['ai_metadata']['usage']['cost_currency'] ?? 'moeda informada pelo provedor' }}).</p>
+                        @endif
+                    </div>
+                @endif
+
+                @can('view-costs')
+                    <div class="mt-4 grid gap-3 sm:grid-cols-3">
+                        <article class="rounded-lg border border-indigo-100 bg-white p-4">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">2 reuniões adicionais iguais</p>
+                            <p class="mt-1 text-xl font-bold text-gray-900">R$ {{ number_format($analysis['two_additional_meetings_cost'], 2, ',', '.') }}</p>
+                            <p class="mt-1 text-xs text-gray-500">Projeção calculada pelo sistema para a análise da IA.</p>
+                        </article>
+                        <article class="rounded-lg border border-indigo-100 bg-white p-4">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Esta agenda + 2 reuniões</p>
+                            <p class="mt-1 text-xl font-bold text-gray-900">R$ {{ number_format($analysis['three_meetings_cost'], 2, ',', '.') }}</p>
+                            <p class="mt-1 text-xs text-gray-500">Custo total estimado dos três encontros.</p>
+                        </article>
+                        <article class="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-emerald-800">Economia ao retirar 1 participante</p>
+                            <p class="mt-1 text-xl font-bold text-emerald-900">R$ {{ number_format($analysis['participant_savings'], 2, ',', '.') }} <span class="text-sm font-medium">por encontro</span></p>
+                            <p class="mt-1 text-xs text-emerald-800">Até R$ {{ number_format($analysis['participant_savings_for_three_meetings'], 2, ',', '.') }} em 3 encontros, usando o menor custo/hora. Confirme com a IA e com a equipe se o papel é essencial.</p>
+                        </article>
+                    </div>
+                @endcan
+            </section>
+
             @can('view-costs')
             <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 @foreach ([['Custo estimado', 'R$ '.number_format($analysis['total'], 2, ',', '.')], ['Horas colaborador', number_format($analysis['collaborator_hours'], 2, ',', '.').' h'], ['Duração da reunião', number_format($analysis['meeting_hours'], 2, ',', '.').' h'], ['Custo por hora de reunião', 'R$ '.number_format($analysis['cost_per_meeting_hour'], 2, ',', '.')]] as [$label, $value])
@@ -95,42 +218,7 @@
                     @endforelse
                 </article>
 
-                <article class="rounded-lg bg-white p-6 shadow-sm">
-                    <h3 class="text-lg font-semibold text-gray-900">Insights gerados por Inteligência Artificial</h3>
-                    <p class="mt-1 text-xs text-gray-500">
-                        @if ($analysis['ai_generated'])
-                            {{ strtoupper($analysis['ai_metadata']['provider']) }} / {{ $analysis['ai_metadata']['model'] }} · Prompt {{ $analysis['ai_metadata']['prompt_version'] }}. Os indicadores financeiros são calculados pelo sistema.
-                        @else
-                            Análise de IA indisponível: {{ $analysis['ai_error'] }} Nenhuma recomendação automática foi apresentada. Os indicadores financeiros continuam calculados pelo sistema.
-                        @endif
-                    </p>
-                    @if ($analysis['ai_result'])
-                        @php($aiResult = $analysis['ai_result'])
-                        <div class="mt-3 space-y-3">
-                            <p class="text-sm font-medium text-gray-800">{{ $aiResult['summary'] }}</p>
-                            @foreach (['findings' => 'Constatações', 'recommendations' => 'Recomendações', 'risks' => 'Riscos', 'opportunities' => 'Oportunidades', 'missing_information' => 'Informações ausentes', 'historical_basis' => 'Base histórica', 'suggested_next_steps' => 'Próximos passos sugeridos'] as $key => $label)
-                                @if (! empty($aiResult[$key]))
-                                    <div>
-                                        <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-500">{{ $label }}</h4>
-                                        <ul class="mt-1 list-inside list-disc space-y-1 text-sm text-gray-700">
-                                            @foreach ($aiResult[$key] as $item)
-                                                <li>@if (is_array($item))<strong>{{ $item['title'] }}</strong>: {{ $item['detail'] }} <span class="text-gray-500">{{ $item['justification'] }}</span>@else{{ $item }}@endif</li>
-                                            @endforeach
-                                        </ul>
-                                    </div>
-                                @endif
-                            @endforeach
-                            <p class="text-xs text-gray-500">Confiança informada pelo modelo: {{ number_format((float) $aiResult['confidence'] * 100, 0, ',', '.') }}% · Gerada em {{ now()->format('d/m/Y H:i') }}.</p>
-                            <details class="text-xs text-gray-500"><summary class="cursor-pointer">Dados utilizados</summary><pre class="mt-2 whitespace-pre-wrap">{{ json_encode($analysis['ai_input_data'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre></details>
-                            @if (filled($analysis['ai_metadata']['usage']['total_tokens'] ?? null))
-                                <p class="text-xs text-gray-500">Consumo registrado pelo provedor: {{ $analysis['ai_metadata']['usage']['total_tokens'] }} tokens totais.</p>
-                            @endif
-                            @if (is_numeric($analysis['ai_metadata']['usage']['cost'] ?? null))
-                                <p class="text-xs text-gray-500">Custo de IA informado pelo provedor: {{ number_format((float) $analysis['ai_metadata']['usage']['cost'], 6) }} (moeda informada pelo provedor).</p>
-                            @endif
-                        </div>
-                    @endif
-                </article>
+
             </section>
 
             <section class="flex flex-wrap justify-end gap-3 rounded-lg bg-white p-5 shadow-sm">

@@ -94,11 +94,21 @@ export default (meetings = [], initialMeetingId = null) => ({
             try {
                 response = await this.sendTimerRequest(this.selectedMeeting.startUrl);
             } catch (error) {
-                if (error.code !== 'advance_confirmation_required') throw error;
+                const confirmation = {
+                    advance_confirmation_required: {
+                        message: error.message,
+                        payload: { confirm_advance: true },
+                    },
+                    late_start_confirmation_required: {
+                        message: error.message,
+                        payload: { confirm_late_start: true },
+                    },
+                }[error.code];
 
-                if (!window.confirm(error.message)) return;
+                if (!confirmation) throw error;
+                if (!window.confirm(confirmation.message)) return;
 
-                response = await this.sendTimerRequest(this.selectedMeeting.startUrl, { confirm_advance: true });
+                response = await this.sendTimerRequest(this.selectedMeeting.startUrl, confirmation.payload);
             }
 
             this.selectedMeeting.actualDurationSeconds = response.actualDurationSeconds;

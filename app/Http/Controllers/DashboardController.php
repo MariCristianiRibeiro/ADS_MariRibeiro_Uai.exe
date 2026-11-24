@@ -14,8 +14,13 @@ class DashboardController extends Controller
     public function index(MeetingCostCalculator $costCalculator): View
     {
         $canViewCosts = Auth::user()->canViewCosts();
+        $today = now('America/Sao_Paulo')->toDateString();
         $meetings = Meeting::query()
             ->where('user_id', Auth::id())
+            ->where(function ($query): void {
+                $query->where('status', 'ongoing')
+                    ->orWhere(fn ($scheduled) => $scheduled->upcomingScheduled());
+            })
             ->with(['users.jobPosition', 'users.participantProfile', 'participants.memberUser.jobPosition', 'meetingParticipants.costSnapshot', 'meetingParticipants.user.jobPosition'])
             ->latest()
             ->get()
@@ -61,6 +66,13 @@ class DashboardController extends Controller
                 ];
             })
             ->values();
+        $pastMeetings = Meeting::query()
+            ->where('user_id', Auth::id())
+            ->whereIn('status', ['draft', 'scheduled'])
+            ->whereNull('timer_started_at')
+            ->whereDate('date', '<', $today)
+            ->orderBy('date')
+            ->get(['id', 'title', 'date']);
 
         $activeMeeting = $meetings->first(fn (array $meeting): bool => $meeting['timerStartedAt'] !== null);
         $selectedMeetingId = $activeMeeting['id'] ?? $meetings->first()['id'] ?? null;
@@ -70,6 +82,7 @@ class DashboardController extends Controller
             'participantsCount' => Participant::count(),
             'activeParticipantsCount' => Participant::where('status', 'active')->count(),
             'dashboardMeetings' => $meetings,
+            'pastMeetings' => $pastMeetings,
             'selectedMeetingId' => $selectedMeetingId,
             'canViewCosts' => $canViewCosts,
         ]);

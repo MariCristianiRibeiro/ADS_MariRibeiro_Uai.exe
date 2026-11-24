@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -54,6 +56,13 @@ class Meeting extends Model
         'schedule_advanced_at' => 'datetime',
         'recurrence_interval' => 'integer',
     ];
+
+    #[Scope]
+    protected function upcomingScheduled(Builder $query): void
+    {
+        $query->where('status', 'scheduled')
+            ->whereDate('date', '>=', now('America/Sao_Paulo')->toDateString());
+    }
 
     protected static function booted(): void
     {

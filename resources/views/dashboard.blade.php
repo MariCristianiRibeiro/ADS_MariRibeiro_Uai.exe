@@ -69,12 +69,34 @@
                     </div>
                 @else
                     <div class="mt-6 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center">
-                        <p class="font-medium text-slate-800">Você ainda não criou reuniões.</p>
-                        <p class="mt-1 text-sm text-slate-500">Cadastre uma reunião para iniciar o cronômetro e acompanhar o investimento.</p>
+                        <p class="font-medium text-slate-800">Você não tem reuniões agendadas para o futuro nem reuniões em andamento.</p>
+                        <p class="mt-1 text-sm text-slate-500">Agende uma reunião ou consulte os registros já existentes.</p>
                         <a href="{{ route('meetings.create') }}" class="dashboard-action mt-4">Criar reunião</a>
                     </div>
                 @endif
             </section>
+
+            @if ($pastMeetings->isNotEmpty())
+                <details class="calculator-panel mb-6">
+                    <summary class="cursor-pointer font-semibold text-slate-900">
+                        Agendas vencidas ({{ $pastMeetings->count() }}) — encerrar ou reagendar
+                    </summary>
+                    <ul class="mt-4 space-y-3">
+                        @foreach ($pastMeetings as $pastMeeting)
+                            <li class="flex flex-col justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center">
+                                <div>
+                                    <p class="font-medium text-slate-900">{{ $pastMeeting->title }}</p>
+                                    <p class="mt-1 text-sm text-slate-600">Data planejada: {{ $pastMeeting->date?->format('d/m/Y') }}</p>
+                                </div>
+                                <div class="flex flex-wrap gap-2">
+                                    <a href="{{ route('meetings.closeout', $pastMeeting) }}" class="dashboard-action justify-center">Encerrar agenda</a>
+                                    <a href="{{ route('meetings.edit', $pastMeeting) }}" class="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-800 shadow-sm transition hover:bg-slate-50">Reagendar agenda</a>
+                                </div>
+                            </li>
+                        @endforeach
+                    </ul>
+                </details>
+            @endif
 
             <div class="grid gap-6">
                 <section class="calculator-panel" aria-labelledby="calculator-title">

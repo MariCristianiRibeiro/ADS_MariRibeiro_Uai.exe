@@ -99,6 +99,16 @@ class MeetingController extends Controller
             ], 409);
         }
 
+        if (in_array($meeting->status, ['draft', 'scheduled'], true)
+            && $meeting->timer_started_at === null
+            && $this->meetingStartHasPassed($meeting)
+            && ! $request->boolean('confirm_late_start')) {
+            return response()->json([
+                'code' => 'late_start_confirmation_required',
+                'message' => 'O horário previsto desta agenda já passou. Deseja iniciar o cronômetro agora? A data e o horário planejados serão mantidos.',
+            ], 409);
+        }
+
         $scheduleAdvanced = false;
         $meeting = DB::transaction(function () use ($meeting, $request, &$scheduleAdvanced): Meeting {
             $meeting = Meeting::query()->lockForUpdate()->findOrFail($meeting->id);
@@ -130,6 +140,14 @@ class MeetingController extends Controller
                     $meeting->end_time = $newEndTime->isSameDay($localNow) ? $newEndTime->format('H:i') : null;
                     $meeting->schedule_advanced_at = now();
                     $scheduleAdvanced = true;
+                } else {
+                    abort_unless(
+                        ! in_array($meeting->status, ['draft', 'scheduled'], true)
+                            || ! $this->meetingStartHasPassed($meeting)
+                            || $request->boolean('confirm_late_start'),
+                        409,
+                        'O horário previsto desta agenda já passou. Confirme se deseja iniciar o cronômetro agora.',
+                    );
                 }
 
                 $meeting->timer_started_at = now();
@@ -382,6 +400,13 @@ class MeetingController extends Controller
         $isPastUnstarted = in_array($meeting->status, ['draft', 'scheduled'], true)
             && $meeting->timer_started_at === null
             && $this->meetingDateIsPast($meeting);
+        $additionalMeetings = Meeting::query()
+            ->where('user_id', $meeting->user_id)
+            ->upcomingScheduled()
+            ->where('id', '<>', $meeting->id)
+            ->orderBy('date')
+            ->orderBy('time')
+            ->get(['id', 'title', 'date']);
 
         return view('meetings.show', [
             'meeting' => $meeting,
@@ -390,7 +415,7 @@ class MeetingController extends Controller
             'optimizationRecommendations' => $predictions->recommendationsFor($meeting, $request->user()),
             'recommendationFeedback' => $meeting->recommendationFeedback->groupBy('recommendation_key')->map->first(),
             'members' => $meeting->users()->orderBy('name')->get(),
-            'additionalMeetings' => Meeting::query()->where('user_id', $meeting->user_id)->where('status', 'completed')->where('id', '<>', $meeting->id)->orderByDesc('date')->get(['id', 'title', 'date']),
+            'additionalMeetings' => $additionalMeetings,
             'directorates' => Directorate::query()->where('active', true)->orderBy('name')->get(),
             'aiConfigured' => $aiService->isConfigured(),
             'aiProvider' => $aiService->provider(),
@@ -807,7 +832,11 @@ class MeetingController extends Controller
         string $notes,
         MeetingAiService $aiService,
     ): MeetingAnalysis {
-        $meeting->loadMissing([
+        foreach (['meetingParticipants', 'decisions', 'actionItems', 'conclusion', 'participantFeedback', 'analyses'] as $relation) {
+            $meeting->unsetRelation($relation);
+        }
+
+        $meeting->load([
             'meetingParticipants.user.jobPosition',
             'meetingParticipants.costSnapshot',
             'decisions',
@@ -1191,6 +1220,15 @@ class MeetingController extends Controller
             || ($scheduledDate === $localNow->toDateString()
                 && $meeting->time !== null
                 && substr((string) $meeting->time, 0, 8) > $localNow->format('H:i:s'));
+    }
+
+    private function meetingStartHasPassed(Meeting $meeting): bool
+    {
+        $localNow = now(self::MEETING_TIMEZONE);
+
+        return $meeting->date->toDateString() === $localNow->toDateString()
+            && $meeting->time !== null
+            && substr((string) $meeting->time, 0, 5) < $localNow->format('H:i');
     }
 
     /** @return array<int, int> */

@@ -4,6 +4,7 @@ use App\Models\Meeting;
 use App\Models\Participant;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
 
@@ -43,6 +44,60 @@ it('dashboard lists only meetings created by the signed-in user', function () {
         ->assertOk()
         ->assertSee('Reunião da minha equipe')
         ->assertDontSee('Reunião de outra equipe');
+});
+
+it('shows scheduled upcoming and ongoing meetings in the dashboard selector', function () {
+    $this->travelTo('2026-11-14 14:00:00');
+    $owner = createUserWithPermissions(['meetings.view', 'meetings.edit']);
+    $scheduledToday = Meeting::create([
+        'user_id' => $owner->id,
+        'title' => 'Agenda de hoje',
+        'date' => '2026-11-14',
+        'status' => 'scheduled',
+    ]);
+    $scheduledUpcoming = Meeting::create([
+        'user_id' => $owner->id,
+        'title' => 'Agenda futura',
+        'date' => '2026-11-15',
+        'status' => 'scheduled',
+    ]);
+    $ongoing = Meeting::create([
+        'user_id' => $owner->id,
+        'title' => 'Agenda em andamento',
+        'date' => '2026-11-13',
+        'status' => 'ongoing',
+    ]);
+    $pastScheduled = Meeting::create([
+        'user_id' => $owner->id,
+        'title' => 'Agenda vencida',
+        'date' => '2026-11-13',
+        'status' => 'scheduled',
+    ]);
+    Meeting::create([
+        'user_id' => $owner->id,
+        'title' => 'Agenda já concluída',
+        'date' => '2026-11-15',
+        'status' => 'completed',
+    ]);
+    Meeting::create([
+        'user_id' => $owner->id,
+        'title' => 'Agenda em rascunho',
+        'date' => '2026-11-15',
+        'status' => 'draft',
+    ]);
+
+    $response = $this->actingAs($owner)->get(route('dashboard'))->assertOk();
+
+    $response->assertViewHas('dashboardMeetings', function ($meetings) use ($scheduledToday, $scheduledUpcoming, $ongoing): bool {
+        return $meetings->pluck('id')->sort()->values()->all() === collect([
+            $scheduledToday->id,
+            $scheduledUpcoming->id,
+            $ongoing->id,
+        ])->sort()->values()->all();
+    });
+    $response->assertViewHas('pastMeetings', fn ($meetings): bool => $meetings->pluck('id')->all() === [$pastScheduled->id]);
+
+    $this->travelBack();
 });
 
 it('uses the participant profile hourly rate for the running meeting cost', function () {
@@ -226,6 +281,59 @@ it('confirms an early start, reschedules the meeting, and requires the advance r
     $this->assertDatabaseHas('meeting_conclusions', [
         'meeting_id' => $meeting->id,
         'schedule_change_reason' => 'Uma decisão urgente exigiu reunir a equipe antes.',
+    ]);
+
+    $this->travelBack();
+});
+
+it('confirms a late start without changing the scheduled date or time', function () {
+    $this->travelTo('2026-11-14 15:00:00');
+    $owner = createUserWithPermissions(['meetings.view', 'meetings.edit']);
+    $meeting = Meeting::create([
+        'user_id' => $owner->id,
+        'title' => 'Agenda com início atrasado',
+        'date' => '2026-11-14',
+        'time' => '11:00',
+        'end_time' => '12:00',
+        'duration_minutes' => 60,
+        'status' => 'scheduled',
+    ]);
+
+    $this->actingAs($owner)
+        ->postJson(route('meetings.timer.start', $meeting))
+        ->assertStatus(409)
+        ->assertJsonPath('code', 'late_start_confirmation_required')
+        ->assertJsonPath('message', 'O horário previsto desta agenda já passou. Deseja iniciar o cronômetro agora? A data e o horário planejados serão mantidos.');
+
+    $this->assertDatabaseHas('meetings', [
+        'id' => $meeting->id,
+        'date' => '2026-11-14 00:00:00',
+        'time' => '11:00',
+        'status' => 'scheduled',
+        'timer_started_at' => null,
+    ]);
+
+    $this->actingAs($owner)
+        ->postJson(route('meetings.timer.start', $meeting), ['confirm_late_start' => true])
+        ->assertOk()
+        ->assertJsonPath('scheduledDate', '2026-11-14')
+        ->assertJsonPath('scheduledTime', '11:00')
+        ->assertJsonPath('timerStartedAt', now()->toIso8601String());
+
+    $this->actingAs($owner)
+        ->postJson(route('meetings.timer.stop', $meeting))
+        ->assertOk();
+
+    $this->actingAs($owner)
+        ->postJson(route('meetings.timer.start', $meeting))
+        ->assertOk();
+
+    $this->assertDatabaseHas('meetings', [
+        'id' => $meeting->id,
+        'date' => '2026-11-14 00:00:00',
+        'time' => '11:00',
+        'status' => 'ongoing',
+        'schedule_advanced_at' => null,
     ]);
 
     $this->travelBack();
@@ -504,6 +612,133 @@ it('includes participant names in the preflight preview', function () {
         ])
         ->assertOk()
         ->assertSee('Ana Souza');
+});
+
+it('shows Gemini preflight insights and sends calculated two-additional-meeting scenarios as context', function () {
+    config([
+        'services.ai.provider' => 'gemini',
+        'services.ai.providers.gemini.api_key' => 'test-api-key',
+    ]);
+    Http::fake([
+        'generativelanguage.googleapis.com/v1beta/models/*:generateContent' => Http::response([
+            'modelVersion' => 'gemini-preflight-test',
+            'candidates' => [[
+                'content' => ['parts' => [[
+                    'text' => json_encode([
+                        'summary' => 'O objetivo pode ser avaliado para alinhamento assíncrono.',
+                        'findings' => ['A pauta deve orientar se a reunião é necessária.'],
+                        'recommendations' => [[
+                            'title' => 'Avaliar alinhamento por e-mail',
+                            'detail' => 'Use e-mail se a pauta exigir apenas compartilhamento de informações.',
+                            'justification' => 'A decisão depende da natureza da pauta.',
+                        ]],
+                        'risks' => [],
+                        'opportunities' => [],
+                        'missing_information' => [],
+                        'confidence' => 0.9,
+                        'historical_basis' => [],
+                        'suggested_next_steps' => ['Confirmar se os participantes precisam deliberar juntos.'],
+                    ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                ]]],
+            ]],
+        ]),
+    ]);
+
+    $owner = createUserWithPermissions(['meetings.view', 'meetings.create', 'reports.costs']);
+    $higherRateAttendee = User::factory()->create(['hourly_rate' => 200]);
+    $lowerRateAttendee = User::factory()->create(['hourly_rate' => 100]);
+
+    $response = $this->actingAs($owner)->post(route('meetings.preview'), [
+        'title' => 'Alinhamento de projeto',
+        'objective' => 'Definir próximos passos do projeto.',
+        'agenda' => 'Revisar as entregas e decidir prioridades.',
+        'expected_outcome' => 'Prioridades definidas.',
+        'date' => '2026-12-10',
+        'duration_minutes' => 60,
+        'participants' => [$higherRateAttendee->id, $lowerRateAttendee->id],
+        'participant_roles' => [
+            $higherRateAttendee->id => 'decision_responsible',
+            $lowerRateAttendee->id => 'participant',
+        ],
+        'organizer_id' => $owner->id,
+        'priority' => 'normal',
+        'recurrence_type' => 'single',
+        'status' => 'scheduled',
+    ])->assertOk()
+        ->assertSee('Resposta real da IA')
+        ->assertSee('GEMINI / gemini-preflight-test')
+        ->assertSee('Avaliar alinhamento por e-mail')
+        ->assertSee('2 reuniões adicionais iguais')
+        ->assertSee('R$ 600,00')
+        ->assertSee('R$ 900,00')
+        ->assertSee('R$ 300,00');
+    $response->assertSeeInOrder([
+        'Resumo executivo da agenda',
+        'O objetivo pode ser avaliado para alinhamento assíncrono.',
+        'Avaliar alinhamento por e-mail',
+        'Use e-mail se a pauta exigir apenas compartilhamento de informações.',
+    ])->assertDontSee('a decisão pode ser compartilhada por e-mail');
+
+    Http::assertSent(function ($request): bool {
+        $prompt = json_decode($request->data()['contents'][0]['parts'][0]['text'], true, flags: JSON_THROW_ON_ERROR);
+        $metrics = $prompt['contexto_real']['indicadores_calculados_pelo_sistema'];
+
+        return str_contains($request->url(), ':generateContent')
+            && $metrics['custo_estimado'] === 300
+            && $metrics['custo_duas_reunioes_adicionais'] === 600
+            && $metrics['custo_tres_reunioes_total'] === 900
+            && $metrics['economia_retirada_participante_em_tres_reunioes'] === 300;
+    });
+});
+
+it('hides calculated meeting costs from preflight viewers without cost permission', function () {
+    config([
+        'services.ai.provider' => 'gemini',
+        'services.ai.providers.gemini.api_key' => 'test-api-key',
+    ]);
+    Http::preventStrayRequests();
+    Http::fake([
+        'generativelanguage.googleapis.com/v1beta/models/*:generateContent' => Http::response([
+            'modelVersion' => 'gemini-preflight-test',
+            'candidates' => [[
+                'content' => ['parts' => [[
+                    'text' => json_encode([
+                        'summary' => 'A pauta exige deliberação em conjunto.',
+                        'findings' => [],
+                        'recommendations' => [],
+                        'risks' => [],
+                        'opportunities' => [],
+                        'missing_information' => [],
+                        'confidence' => 0.9,
+                        'historical_basis' => [],
+                        'suggested_next_steps' => [],
+                    ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                ]]],
+            ]],
+        ]),
+    ]);
+
+    $owner = createUserWithPermissions(['meetings.view', 'meetings.create']);
+    $attendee = User::factory()->create(['hourly_rate' => 100]);
+
+    $this->actingAs($owner)->post(route('meetings.preview'), [
+        'title' => 'Deliberação de projeto',
+        'objective' => 'Aprovar os próximos passos.',
+        'agenda' => 'Decidir prioridade.',
+        'date' => '2026-12-10',
+        'duration_minutes' => 60,
+        'participants' => [$attendee->id],
+        'organizer_id' => $owner->id,
+        'priority' => 'normal',
+        'recurrence_type' => 'single',
+        'status' => 'scheduled',
+    ])->assertOk()
+        ->assertSee('A pauta exige deliberação em conjunto.')
+        ->assertDontSee('R$ 100,00')
+        ->assertDontSee('R$ 300,00')
+        ->assertDontSee('Economia estimada ao reduzir 1 participante');
+
+    Http::assertSent(fn ($request): bool => str_contains($request->url(), ':generateContent'));
 });
 
 it('stores actual meeting time and attendance confirmation separately from planned time', function () {

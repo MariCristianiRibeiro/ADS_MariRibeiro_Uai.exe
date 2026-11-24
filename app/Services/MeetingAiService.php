@@ -30,7 +30,7 @@ class MeetingAiService
         ];
 
         $stageGoal = match ($stage) {
-            'pre_meeting' => 'Avalie necessidade e alternativa assíncrona, participantes essenciais, duração, riscos, resultados possíveis, preparação e reuniões semelhantes. Contextualize os custos recebidos sem recalculá-los.',
+            'pre_meeting' => 'Avalie necessidade da reunião e se o objetivo pode ser alinhado por e-mail ou outro formato assíncrono; indique essa alternativa apenas quando for adequada aos dados e explique limites. Avalie participantes essenciais com base nos papéis informados, duração, riscos, resultados possíveis, preparação e reuniões semelhantes. Considere explicitamente os cenários e indicadores financeiros fornecidos para duas reuniões adicionais e para a redução de um participante. Contextualize esses valores sem recalculá-los, alterá-los ou inventar outros.',
             'during_meeting' => 'Gere resumo parcial, verifique cobertura da pauta com evidências nas anotações, indique assuntos sem informação registrada, prioridades restantes e alertas de tempo/desvio somente se os dados permitirem.',
             'post_meeting' => 'Avalie efetividade comparando objetivo e resultado, presença, condução observável nas notas, encaminhamentos, risco de não conclusão ou retrabalho, necessidade de novo encontro e feedback construtivo. Estime reuniões adicionais somente com histórico suficiente.',
             default => 'Analise os dados de reunião fornecidos.',

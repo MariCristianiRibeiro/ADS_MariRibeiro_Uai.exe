@@ -45,6 +45,9 @@ class MeetingPreflightAnalyzer
         $agenda = $this->weeklyAgendaImpact($data, $participants);
         $durationSavings = $total * 0.25;
         $participantSavings = $participants->count() > 1 ? (float) $people->sortBy('hourly_rate')->first()['cost'] : 0.0;
+        $twoAdditionalMeetingsCost = $total * 2;
+        $threeMeetingsCost = $total + $twoAdditionalMeetingsCost;
+        $participantSavingsForThreeMeetings = $participantSavings * 3;
         $financialMetrics = Auth::user()?->canViewCosts() ? [
             'custo_estimado' => $total,
             'horas_colaborador' => $collaboratorHours,
@@ -54,6 +57,9 @@ class MeetingPreflightAnalyzer
             'projecao_anual' => $annualCost,
             'economia_reducao_duracao_25_porcento' => $durationSavings,
             'economia_retirada_participante' => $participantSavings,
+            'custo_duas_reunioes_adicionais' => $twoAdditionalMeetingsCost,
+            'custo_tres_reunioes_total' => $threeMeetingsCost,
+            'economia_retirada_participante_em_tres_reunioes' => $participantSavingsForThreeMeetings,
         ] : ['observacao' => 'Dados financeiros omitidos por permissão.'];
 
         $aiInput = [
@@ -115,6 +121,9 @@ class MeetingPreflightAnalyzer
             'duration_savings' => $durationSavings,
             'duration_savings_hours' => $collaboratorHours * 0.25,
             'participant_savings' => $participantSavings,
+            'two_additional_meetings_cost' => $twoAdditionalMeetingsCost,
+            'three_meetings_cost' => $threeMeetingsCost,
+            'participant_savings_for_three_meetings' => $participantSavingsForThreeMeetings,
             'weekly_agenda' => $agenda,
             'weekly_agenda_hours' => (float) $agenda->sum('duration_minutes') / 60,
             'similar_meetings' => $similar,
