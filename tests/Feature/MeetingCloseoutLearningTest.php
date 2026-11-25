@@ -97,7 +97,7 @@ it('allows only the meeting organizer to record a conclusion after the timer is 
     $this->actingAs($organizer)
         ->put(route('meetings.conclusion.save', $meeting), $conclusion)
         ->assertRedirect()
-        ->assertSessionHas('warning');
+        ->assertSessionMissing('warning');
 
     expect($meeting->fresh()->conclusion->outcome)->toBe($conclusion['outcome']);
 });
@@ -156,7 +156,7 @@ it('preserves the conclusion when automatic AI analysis fails', function () {
         'summary' => 'Os principais pontos foram revisados.',
         'outcome' => 'A equipe definiu as próximas ações.',
         'objective_achievement' => 'partially',
-    ])->assertRedirect(route('meetings.show', $meeting))->assertSessionHas('warning')->assertSessionHas('success');
+    ])->assertRedirect(route('meetings.show', $meeting))->assertSessionMissing('warning')->assertSessionHas('success');
 
     expect($meeting->fresh()->conclusion->outcome)->toBe('A equipe definiu as próximas ações.')
         ->and(MeetingAnalysis::query()->where('analysis_type', 'post_meeting')->firstOrFail()->status)->toBe('failed');
@@ -244,6 +244,96 @@ it('renders the closeout and learning history for a completed meeting', function
         ->assertSee('Objetivo alcançado')
         ->assertSee('Plano validado')
         ->assertSee('Gerar análise complementar');
+});
+
+it('shows a useful saved AI insight before the available meeting data and conclusion fields', function () {
+    $owner = createUserWithPermissions(['meetings.view', 'meetings.edit']);
+    $meeting = Meeting::create([
+        'user_id' => $owner->id,
+        'organizer_id' => $owner->id,
+        'title' => 'Alinhamento do projeto',
+        'objective' => 'Definir as próximas etapas.',
+        'date' => '2026-11-20',
+        'duration_minutes' => 60,
+        'actual_duration_seconds' => 3600,
+        'status' => 'completed',
+    ]);
+    $meeting->analyses()->create([
+        'requested_by' => $owner->id,
+        'analysis_type' => 'post_meeting',
+        'version' => 1,
+        'transcript' => 'A equipe definiu as próximas etapas.',
+        'result' => [
+            'summary' => 'A equipe concluiu a pauta e alinhou as próximas etapas.',
+            'findings' => ['O plano foi validado pela equipe.'],
+            'recommendations' => [['title' => 'Registrar responsáveis', 'detail' => 'Definir responsáveis para cada etapa.']],
+        ],
+        'provider' => 'gemini',
+        'model' => 'gemini-4-hydrogen',
+        'status' => 'completed',
+        'completed_at' => now(),
+    ]);
+
+    $this->actingAs($owner)->get(route('meetings.closeout', $meeting))->assertOk()
+        ->assertSeeInOrder([
+            'Análise da reunião',
+            'A equipe concluiu a pauta e alinhou as próximas etapas.',
+            'O plano foi validado pela equipe.',
+            'Registrar responsáveis',
+            'Objetivo planejado',
+            'Duração prevista',
+            'Duração realizada',
+            'Resumo e decisões principais',
+            'Resultado e próximos passos',
+            'O objetivo foi alcançado?',
+        ]);
+
+    $this->actingAs($owner)->get(route('meetings.show', $meeting))->assertOk()
+        ->assertSeeInOrder([
+            'Análise da reunião',
+            'A equipe concluiu a pauta e alinhou as próximas etapas.',
+            'Planejamento',
+        ])
+        ->assertDontSee('Assistente de otimização')
+        ->assertDontSee('Aceitar orientação')
+        ->assertDontSee('Rejeitar orientação');
+});
+
+it('shows available meeting data and keeps the conclusion form usable when saved AI output has no useful content', function () {
+    $owner = createUserWithPermissions(['meetings.view', 'meetings.edit']);
+    $meeting = Meeting::create([
+        'user_id' => $owner->id,
+        'organizer_id' => $owner->id,
+        'title' => 'Reunião sem análise útil',
+        'objective' => 'Validar o plano da equipe.',
+        'date' => '2026-11-20',
+        'duration_minutes' => 45,
+        'status' => 'completed',
+    ]);
+    $meeting->analyses()->create([
+        'requested_by' => $owner->id,
+        'analysis_type' => 'post_meeting',
+        'version' => 1,
+        'transcript' => 'Análise sem conteúdo útil.',
+        'result' => ['summary' => ' ', 'findings' => [], 'recommendations' => []],
+        'provider' => 'gemini',
+        'model' => 'gemini-4-hydrogen',
+        'status' => 'completed',
+        'completed_at' => now(),
+    ]);
+
+    $this->actingAs($owner)->get(route('meetings.closeout', $meeting))->assertOk()
+        ->assertSee('Validar o plano da equipe.')
+        ->assertSee('Duração prevista')
+        ->assertSee('Resumo e decisões principais')
+        ->assertSee('Concluir reunião')
+        ->assertDontSee('Análise da reunião')
+        ->assertDontSee('Duração realizada')
+        ->assertDontSee('Custo realizado');
+
+    $this->actingAs($owner)->get(route('meetings.show', $meeting))->assertOk()
+        ->assertDontSee('Ver análise completa')
+        ->assertDontSee('Nenhuma análise de IA registrada nesta reunião.');
 });
 
 it('shows only upcoming scheduled meetings in the follow-up meeting selector', function () {

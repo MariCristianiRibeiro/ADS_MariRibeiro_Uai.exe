@@ -228,7 +228,7 @@ it('tracks action dependencies, decisions, and conclusion against the meeting', 
         'summary' => 'Reunião concluída.',
         'outcome' => 'Plano aprovado e distribuído.',
         'objective_achievement' => 'yes',
-    ])->assertRedirect()->assertSessionHas('warning');
+    ])->assertRedirect()->assertSessionMissing('warning');
 
     expect($actionItem->fresh()->status)->toBe('completed')
         ->and($actionItem->fresh()->completed_at)->not->toBeNull()

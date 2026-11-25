@@ -76,8 +76,11 @@ class MeetingController extends Controller
             'participants.memberUser.jobPosition',
         ]);
 
+        $aiInsight = $this->closeoutAiInsight($meeting);
+
         return view('meetings.closeout', [
             'meeting' => $meeting,
+            'aiInsight' => $aiInsight,
             'isPastUnstarted' => $isPastUnstarted,
             'canManageMeetingConclusion' => $this->canManageMeetingConclusion($request->user(), $meeting),
             'requiresScheduleChangeReason' => $meeting->schedule_advanced_at !== null
@@ -88,6 +91,80 @@ class MeetingController extends Controller
                 'actual' => $meeting->actual_duration_seconds === null ? null : $costs->total($meeting),
             ] : null,
         ]);
+    }
+
+    /** @return array{summary: ?string, finding: ?string, recommendation: ?array{title: ?string, detail: ?string}}|null */
+    private function closeoutAiInsight(Meeting $meeting): ?array
+    {
+        $analyses = $meeting->relationLoaded('analyses')
+            ? $meeting->analyses
+            : $meeting->analyses()->get();
+        $analysis = $analyses
+            ->whereIn('analysis_type', ['during_meeting', 'post_meeting'])
+            ->filter(fn (MeetingAnalysis $analysis): bool => $analysis->completed_at !== null && $this->hasUsefulAnalysisContent($analysis))
+            ->sortByDesc('completed_at')
+            ->first();
+        $result = $analysis?->result;
+
+        if (! is_array($result)) {
+            return null;
+        }
+
+        $summary = is_string($result['summary'] ?? null) && filled($result['summary'])
+            ? trim($result['summary'])
+            : null;
+        $finding = collect(['findings', 'risks', 'opportunities'])
+            ->map(fn (string $key): mixed => $result[$key] ?? [])
+            ->filter(fn (mixed $items): bool => is_array($items))
+            ->flatten()
+            ->first(fn (mixed $item): bool => is_string($item) && filled($item));
+        $recommendation = collect(is_array($result['recommendations'] ?? null) ? $result['recommendations'] : [])
+            ->filter(fn (mixed $item): bool => is_array($item))
+            ->map(fn (array $item): array => [
+                'title' => is_string($item['title'] ?? null) && filled($item['title']) ? trim($item['title']) : null,
+                'detail' => is_string($item['detail'] ?? null) && filled($item['detail']) ? trim($item['detail']) : null,
+            ])
+            ->first(fn (array $item): bool => $item['title'] !== null || $item['detail'] !== null);
+
+        if ($summary === null && ! is_string($finding) && $recommendation === null) {
+            return null;
+        }
+
+        return [
+            'summary' => $summary,
+            'finding' => is_string($finding) && filled($finding) ? trim($finding) : null,
+            'recommendation' => $recommendation,
+        ];
+    }
+
+    private function hasUsefulAnalysisContent(MeetingAnalysis $analysis): bool
+    {
+        if ($analysis->status !== 'completed') {
+            return false;
+        }
+
+        $result = $analysis->result;
+        if (! is_array($result)) {
+            return filled($analysis->summary)
+                || collect($analysis->decisions ?? [])->contains(fn (mixed $item): bool => is_string($item) && filled($item))
+                || collect($analysis->action_items ?? [])->contains(fn (mixed $item): bool => is_array($item) && filled($item['description'] ?? null));
+        }
+
+        $hasText = collect(['summary', 'findings', 'risks', 'opportunities', 'missing_information', 'historical_basis', 'suggested_next_steps'])
+            ->contains(function (string $key) use ($result): bool {
+                $value = $result[$key] ?? null;
+                if (is_string($value)) {
+                    return filled($value);
+                }
+
+                return is_array($value)
+                    && collect($value)->contains(fn (mixed $item): bool => is_string($item) && filled($item));
+            });
+        $hasRecommendation = collect(is_array($result['recommendations'] ?? null) ? $result['recommendations'] : [])
+            ->contains(fn (mixed $item): bool => is_array($item)
+                && collect(['title', 'detail', 'justification'])->contains(fn (string $key): bool => is_string($item[$key] ?? null) && filled($item[$key])));
+
+        return $hasText || $hasRecommendation;
     }
 
     public function startTimer(Request $request, Meeting $meeting, MeetingPredictionService $predictions): JsonResponse
@@ -404,7 +481,6 @@ class MeetingController extends Controller
             'meetingParticipants.user',
             'actionItems.history.actor',
             'predictions.evaluations',
-            'recommendationFeedback',
         ]);
         $learningMeetings = Meeting::query()->where('user_id', $meeting->user_id)->where('status', 'completed')
             ->where(function ($query) use ($meeting): void {
@@ -424,11 +500,11 @@ class MeetingController extends Controller
 
         return view('meetings.show', [
             'meeting' => $meeting,
+            'aiInsight' => $meeting->status === 'completed' ? $this->closeoutAiInsight($meeting) : null,
+            'displayAnalyses' => $meeting->analyses->filter(fn (MeetingAnalysis $analysis): bool => $this->hasUsefulAnalysisContent($analysis))->values(),
             'isPastUnstarted' => $isPastUnstarted,
             'canManageMeetingConclusion' => $this->canManageMeetingConclusion($request->user(), $meeting),
             'statisticalPredictions' => $meeting->predictions->groupBy('generation')->last() ?? collect(),
-            'optimizationRecommendations' => $predictions->recommendationsFor($meeting, $request->user()),
-            'recommendationFeedback' => $meeting->recommendationFeedback->groupBy('recommendation_key')->map->first(),
             'members' => $meeting->users()->orderBy('name')->get(),
             'additionalMeetings' => $additionalMeetings,
             'directorates' => Directorate::query()->where('active', true)->orderBy('name')->get(),
@@ -762,8 +838,7 @@ class MeetingController extends Controller
 
         if (! $aiService->isConfigured()) {
             return redirect()->route('meetings.show', $meeting)
-                ->with('success', 'Conclusão registrada e dados preservados para análises futuras.')
-                ->with('warning', 'Configure a chave do provedor de IA no servidor para gerar os insights desta reunião.');
+                ->with('success', 'Conclusão registrada.');
         }
 
         $analysisNotes = collect([
@@ -782,12 +857,11 @@ class MeetingController extends Controller
 
         if ($analysis->status === 'failed') {
             return redirect()->route('meetings.show', $meeting)
-                ->with('success', 'Conclusão registrada e dados preservados para análises futuras.')
-                ->with('warning', 'A conclusão foi salva, mas a análise por IA falhou. Você pode tentar novamente na seção de insights.');
+                ->with('success', 'Conclusão registrada.');
         }
 
         return redirect()->route('meetings.show', $meeting)
-            ->with('success', 'Conclusão registrada e insights gerados. Os dados também serão usados nas análises futuras.');
+            ->with('success', 'Conclusão registrada.');
     }
 
     public function storeParticipantFeedback(Request $request, Meeting $meeting): RedirectResponse

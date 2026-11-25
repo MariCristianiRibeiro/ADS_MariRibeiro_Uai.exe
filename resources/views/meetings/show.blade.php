@@ -15,6 +15,17 @@
             @if (session('warning')) <div class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">{{ session('warning') }}</div> @endif
             @if ($errors->any()) <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-800"><p class="font-semibold">Revise os campos informados.</p><ul class="mt-2 list-inside list-disc">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div> @endif
 
+            @if ($aiInsight)
+                <section class="rounded-lg border-l-4 border-teal-600 bg-white px-5 py-4 shadow-sm">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-teal-700">Análise da reunião</p>
+                    @if ($aiInsight['summary'])<p class="mt-2 text-base font-semibold leading-6 text-gray-900">{{ $aiInsight['summary'] }}</p>@endif
+                    @if ($aiInsight['finding'])<p class="mt-2 text-sm leading-5 text-gray-700">{{ $aiInsight['finding'] }}</p>@endif
+                    @if ($aiInsight['recommendation'])
+                        <p class="mt-2 text-sm text-gray-700"><span class="font-semibold">{{ $aiInsight['recommendation']['title'] }}</span>@if ($aiInsight['recommendation']['detail']){{ $aiInsight['recommendation']['title'] ? ' — ' : '' }}{{ $aiInsight['recommendation']['detail'] }}@endif</p>
+                    @endif
+                </section>
+            @endif
+
             <section class="grid gap-6 lg:grid-cols-3">
                 <div class="rounded-lg bg-white p-5 shadow-sm lg:col-span-2">
                     <h3 class="font-semibold text-gray-900">Planejamento</h3>
@@ -49,7 +60,7 @@
                 </div>
             </section>
 
-            <section class="grid gap-6 lg:grid-cols-2">
+            <section class="grid gap-6">
                 <div class="rounded-lg border border-violet-200 bg-violet-50/40 p-5 shadow-sm">
                     <h3 class="font-semibold text-gray-900">Previsões históricas</h3>
                     <p class="mt-1 text-xs text-gray-600">Estimativas estatísticas validadas separadamente da análise generativa. Amostra insuficiente não produz valor previsto.</p>
@@ -68,30 +79,6 @@
                                 <article class="rounded-md bg-white p-3"><p class="text-sm font-medium text-gray-800">{{ ['planned_cost' => 'Custo previsto determinístico', 'recurring_monthly_cost' => 'Projeção mensal da recorrência', 'recurring_annual_cost' => 'Projeção anual da recorrência'][$prediction->prediction_type] }}</p><p class="mt-1 text-lg font-semibold text-violet-900">R$ {{ number_format($prediction->predicted_value, 2, ',', '.') }}</p><p class="text-xs text-gray-500">Calculado pelo custo-hora real e frequência cadastrada · {{ $prediction->model_version }}</p></article>
                             @endforeach
                         @endcan
-                    </div>
-                </div>
-                <div class="rounded-lg border border-teal-200 bg-teal-50/30 p-5 shadow-sm">
-                    <h3 class="font-semibold text-gray-900">Assistente de otimização</h3>
-                    <p class="mt-1 text-xs text-gray-600">Orientações baseadas em regras e no histórico disponível; não são previsões estatísticas nem avaliação de desempenho individual.</p>
-                    <div class="mt-3 space-y-3">
-                        @forelse ($optimizationRecommendations as $recommendation)
-                            @php($recordedFeedback = $recommendationFeedback->get($recommendation['key']))
-                            <article class="rounded-md bg-white p-3">
-                                <h4 class="text-sm font-semibold text-gray-800">{{ $recommendation['title'] }}</h4>
-                                <p class="mt-1 text-sm text-gray-700">{{ $recommendation['reason'] }}</p>
-                                <p class="mt-1 text-sm text-gray-600">Orientação: {{ $recommendation['guidance'] }}</p>
-                                @can('view-costs') @if (isset($recommendation['estimated_saving']))<p class="mt-1 text-xs font-medium text-teal-800">Economia potencial estimada no cenário: R$ {{ number_format($recommendation['estimated_saving'], 2, ',', '.') }} com redução de {{ $recommendation['saving_scenario_minutes'] }} min; depende da duração efetiva.</p>@endif @endcan
-                                @if ($recordedFeedback)<p class="mt-2 text-xs text-gray-500">Resposta registrada: {{ $recordedFeedback->decision === 'accepted' ? 'aceita' : 'rejeitada' }}{{ $recordedFeedback->rationale ? ' · '.$recordedFeedback->rationale : '' }}</p>@endif
-                                @can('meetings.edit')
-                                    <form method="POST" action="{{ route('meetings.recommendations.feedback', $meeting) }}" class="mt-3 grid gap-2 sm:grid-cols-[1fr_2fr_auto]">@csrf
-                                        <input type="hidden" name="recommendation_key" value="{{ $recommendation['key'] }}">
-                                        <select name="decision" required class="rounded-md border-gray-300 text-sm"><option value="accepted">Aceitar orientação</option><option value="rejected">Rejeitar orientação</option></select>
-                                        <input name="rationale" maxlength="2000" placeholder="Motivo (opcional)" class="rounded-md border-gray-300 text-sm">
-                                        <button class="rounded-md bg-teal-700 px-3 py-2 text-xs font-semibold text-white">Registrar</button>
-                                    </form>
-                                @endcan
-                            </article>
-                        @empty<p class="text-sm text-gray-500">Nenhuma orientação contextual identificada para este registro.</p>@endforelse
                     </div>
                 </div>
             </section>
@@ -306,7 +293,7 @@
                 @endcan
 
                 <div class="mt-5 space-y-4">
-                    @forelse ($meeting->analyses as $analysis)
+                    @foreach ($displayAnalyses as $analysis)
                         <article class="rounded-md border border-gray-200 p-4">
                             <div class="flex flex-wrap justify-between gap-2">
                                 <h4 class="font-semibold text-gray-900">
@@ -317,22 +304,31 @@
                             </div>
                             @if ($analysis->status === 'completed' && $analysis->result)
                                 @php($aiResult = $analysis->result)
-                                <p class="mt-3 text-sm font-medium text-gray-800">{{ $aiResult['summary'] }}</p>
+                                @if (filled($aiResult['summary'] ?? null))<p class="mt-3 text-sm font-medium text-gray-800">{{ $aiResult['summary'] }}</p>@endif
                                 <details class="mt-4 border-t border-gray-100 pt-3">
                                     <summary class="cursor-pointer text-sm font-semibold text-indigo-700">Ver análise completa</summary>
                                 @foreach (['findings' => 'Constatações da IA', 'recommendations' => 'Recomendações da IA', 'risks' => 'Riscos', 'opportunities' => 'Oportunidades', 'missing_information' => 'Limitações e informações ausentes', 'historical_basis' => 'Base histórica', 'suggested_next_steps' => 'Próximos passos sugeridos'] as $key => $label)
-                                    @if (! empty($aiResult[$key]))
+                                    @if (is_array($aiResult[$key] ?? null) && ! empty($aiResult[$key]))
                                         <div class="mt-3">
                                             <h5 class="text-xs font-semibold uppercase tracking-wide text-gray-500">{{ $label }}</h5>
                                             <ul class="mt-1 list-inside list-disc space-y-1 text-sm text-gray-700">
                                                 @foreach ($aiResult[$key] as $item)
-                                                    <li>@if (is_array($item))<strong>{{ $item['title'] }}</strong>: {{ $item['detail'] }} <span class="text-gray-500">{{ $item['justification'] }}</span>@else{{ $item }}@endif</li>
+                                                    @if (is_string($item) && filled($item))
+                                                        <li>{{ $item }}</li>
+                                                    @elseif ($key === 'recommendations' && is_array($item) && (filled($item['title'] ?? null) || filled($item['detail'] ?? null) || filled($item['justification'] ?? null)))
+                                                        <li>
+                                                            @if (filled($item['title'] ?? null))<strong>{{ $item['title'] }}</strong>@endif
+                                                            @if (filled($item['detail'] ?? null)){{ filled($item['title'] ?? null) ? ': ' : '' }}{{ $item['detail'] }}@endif
+                                                            @if (filled($item['justification'] ?? null))<span class="text-gray-500">{{ filled($item['detail'] ?? null) ? ' ' : '' }}{{ $item['justification'] }}</span>@endif
+                                                        </li>
+                                                    @endif
                                                 @endforeach
                                             </ul>
                                         </div>
                                     @endif
                                 @endforeach
-                                <p class="mt-3 text-xs text-gray-500">Confiança declarada pelo modelo: {{ number_format((float) $aiResult['confidence'] * 100, 0, ',', '.') }}%. Consumo reportado: {{ data_get($analysis->usage, 'total_tokens', 'não informado') }} tokens.</p>
+                                @if (is_numeric($aiResult['confidence'] ?? null))<p class="mt-3 text-xs text-gray-500">Confiança declarada pelo modelo: {{ number_format((float) $aiResult['confidence'] * 100, 0, ',', '.') }}%.</p>@endif
+                                @if (is_numeric(data_get($analysis->usage, 'total_tokens')))<p class="mt-1 text-xs text-gray-500">Consumo reportado: {{ data_get($analysis->usage, 'total_tokens') }} tokens.</p>@endif
                                 </details>
 
                                 @can('view-costs')
@@ -346,15 +342,9 @@
                                 <p class="mt-2 whitespace-pre-line text-sm text-gray-700">{{ $analysis->summary }}</p>
                                 @if ($analysis->decisions)<ul class="mt-2 list-inside list-disc text-sm text-gray-700">@foreach ($analysis->decisions as $decision)<li>{{ $decision }}</li>@endforeach</ul>@endif
                                 @if ($analysis->action_items)<ul class="mt-2 space-y-1 text-sm text-gray-700">@foreach ($analysis->action_items as $action)<li>{{ $action['description'] ?? '' }} · Responsável: {{ $action['responsible_hint'] ?? 'não informado' }} · Prazo: {{ $action['deadline_hint'] ?? 'não informado' }}</li>@endforeach</ul>@endif
-                            @elseif ($analysis->status === 'failed')
-                                <p class="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{{ $analysis->error_message ?: 'A chamada ao provedor de IA não foi concluída.' }}</p>
-                            @else
-                                <p class="mt-3 text-sm text-gray-500">Análise ainda não concluída.</p>
                             @endif
                         </article>
-                    @empty
-                        <p class="text-sm text-gray-500">Nenhuma análise de IA registrada nesta reunião.</p>
-                    @endforelse
+                    @endforeach
                 </div>
             </section>
             <a href="{{ route('meetings.index') }}" class="text-sm font-medium text-teal-700">Voltar para reuniões</a>

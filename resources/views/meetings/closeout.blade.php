@@ -25,55 +25,66 @@
                 </div>
             @endif
 
-            <section class="rounded-xl bg-white p-5 shadow-sm sm:p-7">
-                <div class="border-b border-gray-100 pb-4">
-                    <p class="text-sm text-gray-600">
-                        Data planejada:
-                        <strong>{{ $meeting->date?->format('d/m/Y') }}</strong>
-                        @if ($meeting->time)
-                            às <strong>{{ substr($meeting->time, 0, 5) }}</strong>
-                        @endif
-                    </p>
-                    @if ($isPastUnstarted)
-                        <p class="mt-3 rounded-md bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-                            Esta agenda venceu sem iniciar o cronômetro. Informe o motivo e registre o resultado para encerrá-la.
-                        </p>
-                    @else
-                        <p class="mt-3 text-sm leading-6 text-gray-600">
-                            Preencha os dados principais da reunião. Os indicadores adicionais são opcionais.
+            @if ($aiInsight)
+                <section class="rounded-lg border-l-4 border-teal-600 bg-white px-5 py-4 shadow-sm">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-teal-700">Análise da reunião</p>
+                    @if ($aiInsight['summary'])
+                        <p class="mt-2 text-base font-semibold leading-6 text-gray-900">{{ $aiInsight['summary'] }}</p>
+                    @endif
+                    @if ($aiInsight['finding'])
+                        <p class="mt-2 text-sm leading-5 text-gray-700">{{ $aiInsight['finding'] }}</p>
+                    @endif
+                    @if ($aiInsight['recommendation'])
+                        <p class="mt-2 text-sm text-gray-700">
+                            <span class="font-semibold">{{ $aiInsight['recommendation']['title'] }}</span>
+                            @if ($aiInsight['recommendation']['detail'])
+                                {{ $aiInsight['recommendation']['title'] ? ' — ' : '' }}{{ $aiInsight['recommendation']['detail'] }}
+                            @endif
                         </p>
                     @endif
-                </div>
+                </section>
+            @endif
 
+            <section class="rounded-lg bg-white p-5 shadow-sm sm:p-6">
                 @if (filled($meeting->objective))
-                    <div class="mt-5 rounded-lg bg-gray-50 p-4">
+                    <div>
                         <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Objetivo planejado</p>
                         <p class="mt-1 text-sm leading-6 text-gray-800">{{ $meeting->objective }}</p>
                     </div>
                 @endif
 
-                <div class="mt-4 grid gap-3 sm:grid-cols-2">
-                    <div class="rounded-lg border border-gray-100 p-4">
-                        <p class="text-xs text-gray-500">Duração prevista</p>
-                        <p class="mt-1 font-semibold text-gray-900">{{ $meeting->duration_minutes ? number_format($meeting->duration_minutes / 60, 1, ',', '.').' h' : 'Não informada' }}</p>
-                    </div>
-                    <div class="rounded-lg border border-gray-100 p-4">
-                        <p class="text-xs text-gray-500">Tempo realizado</p>
-                        <p class="mt-1 font-semibold text-gray-900">{{ $meeting->actual_duration_seconds !== null ? number_format($meeting->actual_duration_seconds / 3600, 1, ',', '.').' h' : 'Sem registro do cronômetro' }}</p>
-                    </div>
+                @php($participantNames = $meeting->meetingParticipants->map(fn ($participant) => $participant->user?->name)->filter())
+                <dl class="mt-4 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+                    @if ($meeting->date)
+                        <div><dt class="text-xs text-gray-500">Data</dt><dd class="mt-0.5 font-medium text-gray-900">{{ $meeting->date->format('d/m/Y') }}{{ $meeting->time ? ' · '.substr($meeting->time, 0, 5) : '' }}</dd></div>
+                    @endif
+                    @if ($meeting->duration_minutes)
+                        <div><dt class="text-xs text-gray-500">Duração prevista</dt><dd class="mt-0.5 font-medium text-gray-900">{{ number_format($meeting->duration_minutes / 60, 1, ',', '.') }} h</dd></div>
+                    @endif
+                    @if ($meeting->actual_duration_seconds !== null)
+                        <div><dt class="text-xs text-gray-500">Duração realizada</dt><dd class="mt-0.5 font-medium text-gray-900">{{ number_format($meeting->actual_duration_seconds / 3600, 1, ',', '.') }} h</dd></div>
+                    @endif
                     @if ($costComparison)
-                        <div class="rounded-lg border border-gray-100 p-4">
-                            <p class="text-xs text-gray-500">Custo previsto</p>
-                            <p class="mt-1 font-semibold text-gray-900">R$ {{ number_format($costComparison['estimated'], 2, ',', '.') }}</p>
-                        </div>
-                        <div class="rounded-lg border border-gray-100 p-4">
-                            <p class="text-xs text-gray-500">Custo realizado</p>
-                            <p class="mt-1 font-semibold text-gray-900">{{ $costComparison['actual'] === null ? 'Sem registro de tempo real' : 'R$ '.number_format($costComparison['actual'], 2, ',', '.') }}</p>
+                        <div><dt class="text-xs text-gray-500">Custo previsto</dt><dd class="mt-0.5 font-medium text-gray-900">R$ {{ number_format($costComparison['estimated'], 2, ',', '.') }}</dd></div>
+                        @if ($costComparison['actual'] !== null)
+                            <div><dt class="text-xs text-gray-500">Custo realizado</dt><dd class="mt-0.5 font-medium text-gray-900">R$ {{ number_format($costComparison['actual'], 2, ',', '.') }}</dd></div>
+                        @endif
+                    @endif
+                    @if ($participantNames->isNotEmpty())
+                        <div class="sm:col-span-2">
+                            <dt class="text-xs text-gray-500">Participantes</dt>
+                            <dd class="mt-0.5 text-gray-800">{{ $participantNames->join(', ') }}</dd>
                         </div>
                     @endif
-                </div>
+                </dl>
+            </section>
 
-                <form method="POST" action="{{ route('meetings.conclusion.save', $meeting) }}" class="mt-5 space-y-5">
+            <section class="rounded-lg bg-white p-5 shadow-sm sm:p-6">
+                @if ($isPastUnstarted)
+                    <p class="mb-4 text-sm text-amber-800">Agenda vencida sem cronômetro iniciado.</p>
+                @endif
+
+                <form method="POST" action="{{ route('meetings.conclusion.save', $meeting) }}" class="space-y-4">
                     @csrf
                     @method('PUT')
 
@@ -94,7 +105,7 @@
                     @endif
 
                     <label for="summary" class="block text-sm font-medium text-gray-800">
-                        Resumo da reunião
+                        Resumo e decisões principais
                         <textarea
                             id="summary"
                             name="summary"
@@ -108,7 +119,7 @@
                     </label>
 
                     <label for="outcome" class="block text-sm font-medium text-gray-800">
-                        Qual foi o resultado?
+                        Resultado e próximos passos
                         <textarea
                             id="outcome"
                             name="outcome"
@@ -138,10 +149,10 @@
                     </label>
 
                     <details class="rounded-md border border-gray-200 px-4 py-3">
-                        <summary class="cursor-pointer text-sm font-semibold text-gray-800">Indicadores adicionais (opcional)</summary>
+                        <summary class="cursor-pointer text-sm font-semibold text-gray-800">Outros dados (opcional)</summary>
                         <div class="mt-4 grid gap-4 sm:grid-cols-2">
                             <label class="block text-sm font-medium text-gray-700">
-                                Decisões tomadas
+                                Quantidade de decisões
                                 <input type="number" min="0" name="decisions_count" value="{{ old('decisions_count', $meeting->conclusion?->decisions_count ?? 0) }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
                             </label>
                             <label class="block text-sm font-medium text-gray-700">
@@ -179,7 +190,6 @@
                             @if ($meeting->meetingParticipants->isNotEmpty())
                                 <fieldset class="space-y-3 rounded-md border border-gray-200 p-3 sm:col-span-2">
                                     <legend class="px-1 text-sm font-semibold text-gray-800">Participação (opcional)</legend>
-                                    <p class="text-xs text-gray-500">Registre presença e participação para contextualizar os indicadores, sem classificar desempenho individual.</p>
                                     @foreach ($meeting->meetingParticipants as $participant)
                                         <div class="grid gap-3 border-b border-gray-100 py-3 last:border-0 sm:grid-cols-2">
                                             <p class="text-sm font-medium text-gray-700 sm:col-span-2">{{ $participant->user?->name ?? 'Participante' }}</p>
@@ -229,7 +239,7 @@
                             Voltar ao painel
                         </a>
                         <button class="inline-flex items-center justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800">
-                            Salvar conclusão
+                            Concluir reunião
                         </button>
                     </div>
                 </form>
