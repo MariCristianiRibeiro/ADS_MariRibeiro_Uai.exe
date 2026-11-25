@@ -28,25 +28,25 @@
                             @endforeach
                         </select>
 
-                        <div class="mt-6 grid gap-6 rounded-xl bg-slate-950 p-6 text-white shadow-lg sm:grid-cols-[minmax(0,1.2fr)_minmax(14rem,0.8fr)] sm:items-center sm:p-8">
+                        <div class="mt-6 grid gap-6 rounded-xl bg-slate-950 p-6 text-white shadow-lg {{ $canViewCosts ? 'sm:grid-cols-2' : '' }} sm:items-center sm:p-8">
+                            @if ($canViewCosts)
+                                <div>
+                                    <p class="text-sm font-semibold uppercase tracking-[0.18em] text-teal-300">Investimento acumulado</p>
+                                    <p class="mt-3 text-5xl font-bold tabular-nums tracking-tight text-white sm:text-6xl lg:text-7xl" x-text="formatCurrency(investedValue)">R$ 0,00</p>
+                                    <p class="mt-2 text-xs text-slate-400">Calculado pelo valor-hora das presenças confirmadas.</p>
+                                </div>
+                            @endif
                             <div>
                                 <div class="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.18em] text-teal-300">
                                     <span class="relative flex h-3 w-3">
                                         <span x-show="isRunning" class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
                                         <span class="relative inline-flex h-3 w-3 rounded-full" x-bind:class="isRunning ? 'bg-emerald-400' : 'bg-slate-500'"></span>
                                     </span>
-                                    <span x-text="isRunning ? 'Reunião em andamento' : selectedMeeting?.status === 'completed' ? 'Reunião finalizada' : 'Cronômetro'"></span>
+                                    <span>Tempo decorrido</span>
                                 </div>
-                                <p class="mt-3 font-mono text-5xl font-bold tabular-nums tracking-tight text-white sm:text-6xl lg:text-7xl" aria-live="off" x-text="formatTime()">00:00:00</p>
+                                <p class="mt-3 font-mono text-5xl font-bold tabular-nums tracking-tight text-white sm:text-6xl" aria-live="off" x-text="formatTime()">00:00:00</p>
                                 <p class="mt-2 text-sm text-slate-400"><span x-text="attendedCount"></span> participante(s) com presença contabilizada</p>
                             </div>
-                            @if ($canViewCosts)
-                                <div class="rounded-lg border border-white/10 bg-white/5 p-5 sm:text-right">
-                                    <p class="text-sm font-medium text-slate-300">Investimento acumulado</p>
-                                    <p class="mt-2 text-3xl font-bold tabular-nums tracking-tight text-teal-300 sm:text-4xl" x-text="formatCurrency(investedValue)">R$ 0,00</p>
-                                    <p class="mt-2 text-xs text-slate-400">Calculado pelo valor-hora das presenças confirmadas.</p>
-                                </div>
-                            @endif
                         </div>
 
                         <div class="mt-5 flex flex-col gap-4">

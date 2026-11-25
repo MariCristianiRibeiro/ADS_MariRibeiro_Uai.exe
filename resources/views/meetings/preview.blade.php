@@ -20,7 +20,7 @@
                             @if ($analysis['ai_generated'])
                                 A IA avaliou o objetivo, o investimento e o contexto disponível. Os valores financeiros são calculados pelo sistema.
                             @else
-                                A análise da IA não ficou disponível: {{ $analysis['ai_error'] }} Os indicadores calculados continuam disponíveis abaixo.
+                                A análise da IA está indisponível no momento. Os indicadores calculados continuam disponíveis abaixo.
                             @endif
                         </p>
                     </div>
