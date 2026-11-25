@@ -54,10 +54,10 @@ class MeetingController extends Controller
         ]);
     }
 
-    public function closeout(Request $request, Meeting $meeting): View
+    public function closeout(Request $request, Meeting $meeting, MeetingCostCalculator $costs): View
     {
         abort_unless($request->user()->hasPermission('meetings.edit'), 403);
-        abort_unless($meeting->organizer_id === $request->user()->id, 403);
+        abort_unless($this->canManageMeetingConclusion($request->user(), $meeting), 403);
 
         $isPastUnstarted = in_array($meeting->status, ['draft', 'scheduled'], true)
             && $meeting->timer_started_at === null
@@ -68,14 +68,25 @@ class MeetingController extends Controller
             'Encerre ou finalize a reunião antes de registrar a conclusão.',
         );
 
-        $meeting->loadMissing(['conclusion', 'meetingParticipants.user']);
+        $meeting->loadMissing([
+            'conclusion',
+            'meetingParticipants.user.jobPosition',
+            'meetingParticipants.costSnapshot',
+            'users.jobPosition',
+            'participants.memberUser.jobPosition',
+        ]);
 
         return view('meetings.closeout', [
             'meeting' => $meeting,
             'isPastUnstarted' => $isPastUnstarted,
+            'canManageMeetingConclusion' => $this->canManageMeetingConclusion($request->user(), $meeting),
             'requiresScheduleChangeReason' => $meeting->schedule_advanced_at !== null
                 || $isPastUnstarted
                 || filled($meeting->conclusion?->schedule_change_reason),
+            'costComparison' => $request->user()->canViewCosts() ? [
+                'estimated' => $costs->estimatedTotal($meeting),
+                'actual' => $meeting->actual_duration_seconds === null ? null : $costs->total($meeting),
+            ] : null,
         ]);
     }
 
@@ -234,7 +245,7 @@ class MeetingController extends Controller
             'timerStartedAt' => null,
             'status' => $meeting->status,
             'redirectUrl' => $meeting->schedule_advanced_at !== null
-                && $meeting->organizer_id === Auth::id()
+                && $this->canManageMeetingConclusion(Auth::user(), $meeting)
                 && Auth::user()->hasPermission('meetings.edit')
                 ? route('meetings.closeout', $meeting)
                 : route('meetings.show', $meeting),
@@ -366,7 +377,8 @@ class MeetingController extends Controller
         abort_unless(
             $meeting->user_id === $request->user()->id
                 || $meeting->organizer_id === $request->user()->id
-                || $meeting->meetingParticipants()->where('user_id', $request->user()->id)->exists(),
+                || $meeting->meetingParticipants()->where('user_id', $request->user()->id)->exists()
+                || $request->user()->hasPermission('access_profiles.administer'),
             403,
         );
 
@@ -413,6 +425,7 @@ class MeetingController extends Controller
         return view('meetings.show', [
             'meeting' => $meeting,
             'isPastUnstarted' => $isPastUnstarted,
+            'canManageMeetingConclusion' => $this->canManageMeetingConclusion($request->user(), $meeting),
             'statisticalPredictions' => $meeting->predictions->groupBy('generation')->last() ?? collect(),
             'optimizationRecommendations' => $predictions->recommendationsFor($meeting, $request->user()),
             'recommendationFeedback' => $meeting->recommendationFeedback->groupBy('recommendation_key')->map->first(),
@@ -681,11 +694,10 @@ class MeetingController extends Controller
         MeetingPredictionService $predictions,
     ): RedirectResponse {
         abort_unless($request->user()->hasPermission('meetings.edit'), 403);
-        abort_unless($meeting->organizer_id === $request->user()->id, 403);
+        abort_unless($this->canManageMeetingConclusion($request->user(), $meeting), 403);
         $isPastUnstarted = in_array($meeting->status, ['draft', 'scheduled'], true)
             && $meeting->timer_started_at === null
             && $this->meetingDateIsPast($meeting);
-        $useSimpleCloseout = $isPastUnstarted || $meeting->schedule_advanced_at !== null;
         abort_unless(
             $meeting->status === 'completed' || $isPastUnstarted,
             409,
@@ -749,7 +761,7 @@ class MeetingController extends Controller
         $predictions->evaluatePending($meeting->id);
 
         if (! $aiService->isConfigured()) {
-            return ($useSimpleCloseout ? redirect()->route('meetings.closeout', $meeting) : back())
+            return redirect()->route('meetings.show', $meeting)
                 ->with('success', 'Conclusão registrada e dados preservados para análises futuras.')
                 ->with('warning', 'Configure a chave do provedor de IA no servidor para gerar os insights desta reunião.');
         }
@@ -769,12 +781,12 @@ class MeetingController extends Controller
         );
 
         if ($analysis->status === 'failed') {
-            return ($useSimpleCloseout ? redirect()->route('meetings.closeout', $meeting) : back())
+            return redirect()->route('meetings.show', $meeting)
                 ->with('success', 'Conclusão registrada e dados preservados para análises futuras.')
                 ->with('warning', 'A conclusão foi salva, mas a análise por IA falhou. Você pode tentar novamente na seção de insights.');
         }
 
-        return ($useSimpleCloseout ? redirect()->route('meetings.closeout', $meeting) : back())
+        return redirect()->route('meetings.show', $meeting)
             ->with('success', 'Conclusão registrada e insights gerados. Os dados também serão usados nas análises futuras.');
     }
 
@@ -1211,6 +1223,12 @@ class MeetingController extends Controller
     private function meetingDateIsPast(Meeting $meeting): bool
     {
         return $meeting->date->toDateString() < now(self::MEETING_TIMEZONE)->toDateString();
+    }
+
+    private function canManageMeetingConclusion(User $user, Meeting $meeting): bool
+    {
+        return $meeting->organizer_id === $user->id
+            || $user->hasPermission('access_profiles.administer');
     }
 
     private function meetingStartIsInFuture(Meeting $meeting): bool

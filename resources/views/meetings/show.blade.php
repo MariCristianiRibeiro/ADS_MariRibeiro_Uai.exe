@@ -116,7 +116,7 @@
                 <div class="rounded-lg bg-white p-5 shadow-sm">
                     <h3 class="font-semibold text-gray-900">Conclusão</h3>
                     @if ($meeting->conclusion)<p class="mt-2 text-xs text-gray-500">Registrada por {{ $meeting->conclusion->recorder?->name ?? 'usuário removido' }} · {{ $meeting->conclusion->concluded_at?->format('d/m/Y H:i') }}</p>@endif
-                    @if (($meeting->status === 'completed' || $isPastUnstarted) && auth()->id() === $meeting->organizer_id && auth()->user()->can('meetings.edit'))
+                    @if (($meeting->status === 'completed' || $isPastUnstarted) && $canManageMeetingConclusion && auth()->user()->can('meetings.edit'))
                     <form method="POST" action="{{ route('meetings.conclusion.save', $meeting) }}" class="mt-3 space-y-3">@csrf @method('PUT')
                         @if ($isPastUnstarted)
                             <p class="rounded-md bg-amber-50 p-3 text-sm text-amber-900">Esta agenda venceu sem iniciar o cronômetro. Informe por que não foi realizada na data planejada e preencha os dados de conclusão para encerrá-la.</p>
@@ -318,6 +318,8 @@
                             @if ($analysis->status === 'completed' && $analysis->result)
                                 @php($aiResult = $analysis->result)
                                 <p class="mt-3 text-sm font-medium text-gray-800">{{ $aiResult['summary'] }}</p>
+                                <details class="mt-4 border-t border-gray-100 pt-3">
+                                    <summary class="cursor-pointer text-sm font-semibold text-indigo-700">Ver análise completa</summary>
                                 @foreach (['findings' => 'Constatações da IA', 'recommendations' => 'Recomendações da IA', 'risks' => 'Riscos', 'opportunities' => 'Oportunidades', 'missing_information' => 'Limitações e informações ausentes', 'historical_basis' => 'Base histórica', 'suggested_next_steps' => 'Próximos passos sugeridos'] as $key => $label)
                                     @if (! empty($aiResult[$key]))
                                         <div class="mt-3">
@@ -331,6 +333,7 @@
                                     @endif
                                 @endforeach
                                 <p class="mt-3 text-xs text-gray-500">Confiança declarada pelo modelo: {{ number_format((float) $aiResult['confidence'] * 100, 0, ',', '.') }}%. Consumo reportado: {{ data_get($analysis->usage, 'total_tokens', 'não informado') }} tokens.</p>
+                                </details>
 
                                 @can('view-costs')
                                     @if ($analysis->provider_cost !== null)<p class="mt-1 text-xs text-gray-500">Custo de IA reportado pelo provedor: {{ number_format((float) $analysis->provider_cost, 6) }} (moeda informada pelo provedor).</p>@endif

@@ -102,6 +102,42 @@ it('allows only the meeting organizer to record a conclusion after the timer is 
     expect($meeting->fresh()->conclusion->outcome)->toBe($conclusion['outcome']);
 });
 
+it('allows administrators to open and save a conclusion for another organizers meeting', function () {
+    config(['services.ai.providers.gemini.api_key' => null]);
+    $admin = createAdminUser();
+    $organizer = createUserWithPermissions(['meetings.view', 'meetings.edit']);
+    $meeting = Meeting::create([
+        'user_id' => $organizer->id,
+        'organizer_id' => $organizer->id,
+        'title' => 'Reunião para encerramento administrativo',
+        'date' => '2026-11-09',
+        'duration_minutes' => 60,
+        'status' => 'completed',
+    ]);
+    $conclusion = [
+        'summary' => 'A reunião foi revisada pela administração.',
+        'outcome' => 'O plano de ação foi aprovado.',
+        'objective_achievement' => 'yes',
+    ];
+
+    $this->actingAs($admin)
+        ->get(route('meetings.closeout', $meeting))
+        ->assertOk();
+
+    $this->actingAs($admin)
+        ->put(route('meetings.conclusion.save', $meeting), $conclusion)
+        ->assertRedirect(route('meetings.show', $meeting))
+        ->assertSessionHasNoErrors()
+        ->assertSessionHas('success');
+
+    $this->actingAs($admin)
+        ->get(route('meetings.show', $meeting))
+        ->assertOk()
+        ->assertSee($conclusion['outcome']);
+
+    expect($meeting->fresh()->conclusion->outcome)->toBe($conclusion['outcome']);
+});
+
 it('preserves the conclusion when automatic AI analysis fails', function () {
     config(['services.ai.providers.gemini.api_key' => 'test-api-key']);
     Http::preventStrayRequests();
@@ -120,7 +156,7 @@ it('preserves the conclusion when automatic AI analysis fails', function () {
         'summary' => 'Os principais pontos foram revisados.',
         'outcome' => 'A equipe definiu as próximas ações.',
         'objective_achievement' => 'partially',
-    ])->assertRedirect()->assertSessionHas('warning');
+    ])->assertRedirect(route('meetings.show', $meeting))->assertSessionHas('warning')->assertSessionHas('success');
 
     expect($meeting->fresh()->conclusion->outcome)->toBe('A equipe definiu as próximas ações.')
         ->and(MeetingAnalysis::query()->where('analysis_type', 'post_meeting')->firstOrFail()->status)->toBe('failed');

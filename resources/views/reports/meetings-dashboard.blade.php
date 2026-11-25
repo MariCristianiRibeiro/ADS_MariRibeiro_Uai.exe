@@ -24,27 +24,33 @@
             <div class="mt-4 flex justify-end"><button class="rounded-lg bg-indigo-700 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-800">Aplicar filtros</button></div>
         </form>
 
-        <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            @php($cards = [
+        @php($cards = [
                 ['Reuniões', number_format($metrics['meeting_count'], 0, ',', '.')],
                 ['Horas colaborador', number_format($metrics['collaborator_hours'], 2, ',', '.').' h'],
-                ['Horas de reunião', number_format($metrics['meeting_hours'], 2, ',', '.').' h'],
                 ['Custo apurado', $canViewCosts ? ($metrics['actual_cost'] === null ? 'Sem dados' : 'R$ '.number_format($metrics['actual_cost'], 2, ',', '.')) : 'Restrito'],
+                ['Encaminhamentos concluídos', $metrics['completion_rate'] === null ? 'Sem dados' : number_format($metrics['completion_rate'], 1, ',', '.').'%'],
+                ['Horas de reunião', number_format($metrics['meeting_hours'], 2, ',', '.').' h],
                 ['Custo médio apurado', $canViewCosts ? ($metrics['average_actual_cost'] === null ? 'Sem dados' : 'R$ '.number_format($metrics['average_actual_cost'], 2, ',', '.')) : 'Restrito'],
                 ['Projeção mensal recorrências', $canViewCosts ? 'R$ '.number_format($metrics['recurring_monthly_projection'], 2, ',', '.') : 'Restrito'],
                 ['Projeção anual recorrências', $canViewCosts ? 'R$ '.number_format($metrics['recurring_annual_projection'], 2, ',', '.') : 'Restrito'],
                 ['Decisões', number_format($metrics['decisions'], 0, ',', '.')],
                 ['Encaminhamentos', number_format($metrics['action_items'], 0, ',', '.')],
-                ['Concluídos', $metrics['completion_rate'] === null ? 'Sem dados' : number_format($metrics['completion_rate'], 1, ',', '.').'%'],
                 ['Concluídos no prazo', $metrics['on_time_rate'] === null ? 'Sem dados' : number_format($metrics['on_time_rate'], 1, ',', '.').'%'],
                 ['Reuniões adicionais realizadas', number_format($metrics['additional_meetings'], 0, ',', '.')],
                 ['Solicitações de reunião adicional', number_format($metrics['additional_meeting_requests'], 0, ',', '.')],
                 ['Tempo médio de resolução', $metrics['avg_resolution_hours'] === null ? 'Sem dados' : number_format($metrics['avg_resolution_hours'], 1, ',', '.').' h'],
                 ['Produtividade percebida', $metrics['productivity'] === null ? 'Sem dados' : number_format($metrics['productivity'], 1, ',', '.').' / 5'],
             ])
-            @foreach ($cards as [$label, $value])<article class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"><p class="text-sm text-gray-500">{{ $label }}</p><p class="mt-2 text-2xl font-semibold text-gray-900">{{ $value }}</p></article>@endforeach
+        <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            @foreach (array_slice($cards, 0, 4) as [$label, $value])<article class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"><p class="text-sm text-gray-500">{{ $label }}</p><p class="mt-2 text-2xl font-semibold text-gray-900">{{ $value }}</p></article>@endforeach
         </section>
-        @if ($canViewCosts)<p class="-mt-4 text-xs text-gray-500">O custo apurado usa duração real e participantes com presença registrada. Investimento previsto, incluindo reuniões sem duração real, neste filtro: R$ {{ number_format($metrics['estimated_cost'], 2, ',', '.') }}. A projeção mensal usa a frequência média cadastrada; a anual respeita a data de encerramento da recorrência.</p>@endif
+        <details class="rounded-xl border border-gray-200 bg-white p-5">
+            <summary class="cursor-pointer text-sm font-semibold text-gray-800">Ver todos os indicadores do período</summary>
+            <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                @foreach (array_slice($cards, 4) as [$label, $value])<article class="rounded-lg bg-gray-50 p-4"><p class="text-sm text-gray-500">{{ $label }}</p><p class="mt-2 text-xl font-semibold text-gray-900">{{ $value }}</p></article>@endforeach
+            </div>
+            @if ($canViewCosts)<p class="mt-4 text-xs text-gray-500">O custo apurado usa duração real e participantes com presença registrada. Investimento previsto, incluindo reuniões sem duração real, neste filtro: R$ {{ number_format($metrics['estimated_cost'], 2, ',', '.') }}. A projeção mensal usa a frequência média cadastrada; a anual respeita a data de encerramento da recorrência.</p>@endif
+        </details>
 
         <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
             <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"><h3 class="font-semibold text-gray-900">Financeiro — custo apurado por dimensão</h3>
@@ -100,11 +106,14 @@
 
         <section class="rounded-xl border border-indigo-200 bg-indigo-50/40 p-5 shadow-sm"><div class="flex flex-wrap items-start justify-between gap-4"><div><h3 class="font-semibold text-gray-900">Inteligência artificial</h3><p class="mt-1 text-sm text-gray-600">A IA comenta apenas os indicadores calculados pelo sistema e o período selecionado.</p></div><form method="POST" action="{{ route('reports.meetings.analyze') }}">@csrf @foreach ($filters as $key => $value)<input type="hidden" name="{{ $key }}" value="{{ $value }}">@endforeach<button @disabled(!$aiConfigured) class="rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">{{ $aiConfigured ? 'Gerar análise dos filtros' : 'IA não configurada' }}</button></form></div>
             @if ($aiError)<p class="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{{ $aiError }}</p>@endif
-            @if ($aiResult)<div class="mt-5 space-y-4"><p class="rounded-lg bg-white p-4 text-sm text-gray-800"><strong>Resumo:</strong> {{ $aiResult['summary'] }}</p>
+            @if ($aiResult)<div class="mt-5"><p class="text-base leading-7 text-gray-800">{{ $aiResult['summary'] }}</p>
+                @if (!empty($aiResult['recommendations']))<div class="mt-4 border-l-2 border-indigo-600 pl-4"><p class="text-xs font-semibold uppercase tracking-wide text-indigo-700">Próxima melhoria</p><h4 class="mt-1 font-semibold text-gray-900">{{ $aiResult['recommendations'][0]['title'] }}</h4><p class="mt-1 text-sm text-gray-700">{{ $aiResult['recommendations'][0]['detail'] }}</p></div>@endif
+                <details class="mt-5 border-t border-indigo-100 pt-4"><summary class="cursor-pointer text-sm font-semibold text-indigo-700">Ver interpretações e recomendações completas</summary><div class="mt-4 space-y-4">
                 @foreach (['opportunities' => 'Principais oportunidades', 'risks' => 'Riscos e pendências', 'findings' => 'Leituras dos indicadores', 'historical_basis' => 'Base histórica', 'suggested_next_steps' => 'Recomendações de otimização'] as $key => $title)
                     @if (!empty($aiResult[$key]))<div><h4 class="text-sm font-semibold text-gray-800">{{ $title }}</h4><ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-700">@foreach ($aiResult[$key] as $item)<li>{{ $item }}</li>@endforeach</ul></div>@endif
                 @endforeach
                 @if (!empty($aiResult['recommendations']))<div class="grid gap-3 sm:grid-cols-2">@foreach ($aiResult['recommendations'] as $recommendation)<article class="rounded-lg bg-white p-4"><h4 class="font-semibold text-gray-900">{{ $recommendation['title'] }}</h4><p class="mt-1 text-sm text-gray-700">{{ $recommendation['detail'] }}</p><p class="mt-2 text-xs text-gray-500">Justificativa: {{ $recommendation['justification'] }}</p></article>@endforeach</div>@endif
+                </div></details>
             </div>@else<p class="mt-4 text-sm text-gray-500">Selecione os filtros e gere uma análise para receber comentários contextuais.</p>@endif
         </section>
     </div></div>

@@ -275,7 +275,7 @@ it('confirms an early start, reschedules the meeting, and requires the advance r
         ->put(route('meetings.conclusion.save', $meeting), $conclusion + [
             'schedule_change_reason' => 'Uma decisão urgente exigiu reunir a equipe antes.',
         ])
-        ->assertRedirect(route('meetings.closeout', $meeting))
+        ->assertRedirect(route('meetings.show', $meeting))
         ->assertSessionHasNoErrors();
 
     $this->assertDatabaseHas('meeting_conclusions', [
@@ -566,7 +566,7 @@ it('requires a reason and conclusion data before closing a past unstarted meetin
         ->put(route('meetings.conclusion.save', $meeting), $conclusion + [
             'schedule_change_reason' => 'Os participantes-chave tiveram um imprevisto.',
         ])
-        ->assertRedirect(route('meetings.closeout', $meeting))
+        ->assertRedirect(route('meetings.show', $meeting))
         ->assertSessionHasNoErrors();
 
     $this->assertDatabaseHas('meetings', [

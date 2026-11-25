@@ -2,8 +2,10 @@
 
 use App\Models\Meeting;
 use App\Models\MeetingAnalysis;
+use App\Services\MeetingAiService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 
 uses(RefreshDatabase::class);
 
@@ -54,6 +56,45 @@ it('stores a structured meeting analysis returned by the Gemini API', function (
     Http::assertSent(fn ($request): bool => str_contains($request->url(), 'generateContent'));
 });
 
+it('retries a transient Gemini connection failure and returns the later response', function () {
+    config(['services.ai.providers.gemini.api_key' => 'test-api-key']);
+    Sleep::fake();
+    $attempts = 0;
+    Http::preventStrayRequests();
+    Http::fake([
+        'generativelanguage.googleapis.com/v1beta/models/*:generateContent' => function () use (&$attempts) {
+            $attempts++;
+
+            if ($attempts === 1) {
+                return Http::failedConnection();
+            }
+
+            return Http::response([
+                'modelVersion' => 'gemini-4-hydrogen',
+                'candidates' => [[
+                    'content' => ['parts' => [['text' => json_encode([
+                        'summary' => 'A pauta foi concluída.',
+                        'findings' => [],
+                        'recommendations' => [],
+                        'risks' => [],
+                        'opportunities' => [],
+                        'missing_information' => [],
+                        'confidence' => 0.9,
+                        'historical_basis' => [],
+                        'suggested_next_steps' => [],
+                    ], JSON_THROW_ON_ERROR)]]],
+                ]],
+            ]);
+        },
+    ]);
+
+    $analysis = app(MeetingAiService::class)->analyze('pre_meeting', ['objective' => 'Concluir a pauta']);
+
+    expect($analysis['result']['summary'])->toBe('A pauta foi concluída.')
+        ->and($analysis['model'])->toBe('gemini-4-hydrogen');
+    Http::assertSentCount(2);
+});
+
 it('requires an API key and edit access before creating an analysis', function () {
     $owner = createUserWithPermissions(['meetings.view', 'meetings.edit']);
     $meeting = Meeting::create([
@@ -80,6 +121,7 @@ it('requires an API key and edit access before creating an analysis', function (
 
 it('preserves a failed analysis without exposing provider errors to the user', function () {
     config(['services.ai.providers.gemini.api_key' => 'test-api-key']);
+    Sleep::fake();
     Http::fake(['generativelanguage.googleapis.com/*' => Http::response(['error' => ['message' => 'provider details']], 503)]);
 
     $owner = createUserWithPermissions(['meetings.view', 'meetings.edit']);
@@ -99,4 +141,5 @@ it('preserves a failed analysis without exposing provider errors to the user', f
     expect(MeetingAnalysis::query()->firstOrFail()->status)->toBe('failed')
         ->and(session('errors')->first('analysis_notes'))->toContain('Tente novamente')
         ->and(session('errors')->first('analysis_notes'))->not->toContain('provider details');
+    Http::assertSentCount(2);
 });

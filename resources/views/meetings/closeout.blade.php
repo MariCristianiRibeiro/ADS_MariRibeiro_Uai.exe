@@ -45,6 +45,34 @@
                     @endif
                 </div>
 
+                @if (filled($meeting->objective))
+                    <div class="mt-5 rounded-lg bg-gray-50 p-4">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Objetivo planejado</p>
+                        <p class="mt-1 text-sm leading-6 text-gray-800">{{ $meeting->objective }}</p>
+                    </div>
+                @endif
+
+                <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div class="rounded-lg border border-gray-100 p-4">
+                        <p class="text-xs text-gray-500">Duração prevista</p>
+                        <p class="mt-1 font-semibold text-gray-900">{{ $meeting->duration_minutes ? number_format($meeting->duration_minutes / 60, 1, ',', '.').' h' : 'Não informada' }}</p>
+                    </div>
+                    <div class="rounded-lg border border-gray-100 p-4">
+                        <p class="text-xs text-gray-500">Tempo realizado</p>
+                        <p class="mt-1 font-semibold text-gray-900">{{ $meeting->actual_duration_seconds !== null ? number_format($meeting->actual_duration_seconds / 3600, 1, ',', '.').' h' : 'Sem registro do cronômetro' }}</p>
+                    </div>
+                    @if ($costComparison)
+                        <div class="rounded-lg border border-gray-100 p-4">
+                            <p class="text-xs text-gray-500">Custo previsto</p>
+                            <p class="mt-1 font-semibold text-gray-900">R$ {{ number_format($costComparison['estimated'], 2, ',', '.') }}</p>
+                        </div>
+                        <div class="rounded-lg border border-gray-100 p-4">
+                            <p class="text-xs text-gray-500">Custo realizado</p>
+                            <p class="mt-1 font-semibold text-gray-900">{{ $costComparison['actual'] === null ? 'Sem registro de tempo real' : 'R$ '.number_format($costComparison['actual'], 2, ',', '.') }}</p>
+                        </div>
+                    @endif
+                </div>
+
                 <form method="POST" action="{{ route('meetings.conclusion.save', $meeting) }}" class="mt-5 space-y-5">
                     @csrf
                     @method('PUT')
