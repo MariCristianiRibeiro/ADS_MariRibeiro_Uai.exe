@@ -234,6 +234,8 @@ class MeetingController extends Controller
             'timerStartedAt' => null,
             'status' => $meeting->status,
             'redirectUrl' => $meeting->schedule_advanced_at !== null
+                && $meeting->organizer_id === Auth::id()
+                && Auth::user()->hasPermission('meetings.edit')
                 ? route('meetings.closeout', $meeting)
                 : route('meetings.show', $meeting),
         ]);

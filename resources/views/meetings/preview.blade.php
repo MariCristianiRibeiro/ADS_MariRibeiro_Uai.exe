@@ -73,7 +73,7 @@
                             @if ($analysis['ai_generated'])
                                 Esta resposta foi gerada pela interação com {{ strtoupper($analysis['ai_metadata']['provider']) }} / {{ $analysis['ai_metadata']['model'] }}. O modelo recebeu os dados da agenda; os valores financeiros exibidos são calculados pelo sistema.
                             @else
-                                Não foi possível obter uma resposta da IA: {{ $analysis['ai_error'] }} Configure o Gemini e tente analisar novamente. Nenhum insight automático foi inventado.
+                                Não foi possível obter uma resposta da IA: {{ $analysis['ai_error'] }} Tente analisar novamente em alguns minutos. Nenhum insight automático foi inventado.
                             @endif
                         </p>
                     </div>

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 use Throwable;
@@ -48,12 +49,14 @@ class MeetingAiService
         try {
             $response = match ($provider) {
                 'gemini' => Http::baseUrl($baseUrl)->withHeaders(['x-goog-api-key' => $apiKey])->acceptJson()->connectTimeout(10)->timeout(60)
+                    ->retry([1000, 2000, 4000], when: fn (Throwable $exception): bool => $exception instanceof RequestException && $exception->response->status() === 503, throw: false)
                     ->post("/models/{$model}:generateContent", [
                         'systemInstruction' => ['parts' => [['text' => $systemPrompt]]],
                         'contents' => [['role' => 'user', 'parts' => [['text' => json_encode($prompt, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)]]]],
                         'generationConfig' => ['responseMimeType' => 'application/json', 'responseSchema' => $this->geminiSchema(), 'maxOutputTokens' => 4096],
                     ]),
                 'openai' => Http::baseUrl($baseUrl)->withToken($apiKey)->acceptJson()->connectTimeout(10)->timeout(60)
+                    ->retry([1000, 2000, 4000], when: fn (Throwable $exception): bool => $exception instanceof RequestException && $exception->response->status() === 503, throw: false)
                     ->post('/chat/completions', [
                         'model' => $model,
                         'messages' => [

@@ -286,6 +286,32 @@ it('confirms an early start, reschedules the meeting, and requires the advance r
     $this->travelBack();
 });
 
+it('redirects an early finished meeting to its details when the timer user is not the organizer', function () {
+    $this->travelTo('2026-11-14 10:00:00');
+    $owner = createUserWithPermissions(['meetings.view', 'meetings.edit', 'meetings.finish']);
+    $organizer = User::factory()->create();
+    $meeting = Meeting::create([
+        'user_id' => $owner->id,
+        'organizer_id' => $organizer->id,
+        'title' => 'Agenda futura de outra pessoa',
+        'date' => '2026-11-16',
+        'time' => '09:00',
+        'duration_minutes' => 60,
+        'status' => 'scheduled',
+    ]);
+
+    $this->actingAs($owner)
+        ->postJson(route('meetings.timer.start', $meeting), ['confirm_advance' => true])
+        ->assertOk();
+
+    $this->actingAs($owner)
+        ->postJson(route('meetings.finish', $meeting))
+        ->assertOk()
+        ->assertJsonPath('redirectUrl', route('meetings.show', $meeting));
+
+    $this->travelBack();
+});
+
 it('confirms a late start without changing the scheduled date or time', function () {
     $this->travelTo('2026-11-14 15:00:00');
     $owner = createUserWithPermissions(['meetings.view', 'meetings.edit']);
