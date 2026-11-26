@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex flex-wrap items-center justify-between gap-3">
-            <div><h2 class="text-xl font-semibold text-gray-800">Inteligência de reuniões</h2><p class="mt-1 text-sm text-gray-500">Indicadores calculados a partir dos registros do sistema.</p></div>
+            
             @if ($canExport)<a href="{{ route('reports.meetings.export', request()->query()) }}" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Exportar CSV</a>@endif
         </div>
     </x-slot>
@@ -24,12 +24,13 @@
             <div class="mt-4 flex justify-end"><button class="rounded-lg bg-teal-700 px-5 py-2 text-sm font-semibold text-white hover:bg-teal-800">Aplicar filtros</button></div>
         </form>
 
-        @php($cards = [
+        @php
+            $cards = [
                 ['Reuniões', number_format($metrics['meeting_count'], 0, ',', '.')],
                 ['Horas colaborador', number_format($metrics['collaborator_hours'], 2, ',', '.').' h'],
                 ['Custo apurado', $canViewCosts ? ($metrics['actual_cost'] === null ? 'Sem dados' : 'R$ '.number_format($metrics['actual_cost'], 2, ',', '.')) : 'Restrito'],
                 ['Encaminhamentos concluídos', $metrics['completion_rate'] === null ? 'Sem dados' : number_format($metrics['completion_rate'], 1, ',', '.').'%'],
-                ['Horas de reunião', number_format($metrics['meeting_hours'], 2, ',', '.').' h],
+                ['Horas de reunião', number_format($metrics['meeting_hours'], 2, ',', '.').' h'],
                 ['Custo médio apurado', $canViewCosts ? ($metrics['average_actual_cost'] === null ? 'Sem dados' : 'R$ '.number_format($metrics['average_actual_cost'], 2, ',', '.')) : 'Restrito'],
                 ['Projeção mensal recorrências', $canViewCosts ? 'R$ '.number_format($metrics['recurring_monthly_projection'], 2, ',', '.') : 'Restrito'],
                 ['Projeção anual recorrências', $canViewCosts ? 'R$ '.number_format($metrics['recurring_annual_projection'], 2, ',', '.') : 'Restrito'],
@@ -40,7 +41,8 @@
                 ['Solicitações de reunião adicional', number_format($metrics['additional_meeting_requests'], 0, ',', '.')],
                 ['Tempo médio de resolução', $metrics['avg_resolution_hours'] === null ? 'Sem dados' : number_format($metrics['avg_resolution_hours'], 1, ',', '.').' h'],
                 ['Produtividade percebida', $metrics['productivity'] === null ? 'Sem dados' : number_format($metrics['productivity'], 1, ',', '.').' / 5'],
-            ])
+            ];
+        @endphp
         <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             @foreach (array_slice($cards, 0, 4) as [$label, $value])<article class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"><p class="text-sm text-gray-500">{{ $label }}</p><p class="mt-2 text-2xl font-semibold text-gray-900">{{ $value }}</p></article>@endforeach
         </section>

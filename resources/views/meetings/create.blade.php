@@ -1,9 +1,8 @@
 <x-app-layout>
-    <x-slot name="header"><h2 class="font-semibold text-xl text-gray-800 leading-tight">Nova reunião</h2></x-slot>
 
-    <div class="py-6">
-        <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white shadow-sm sm:rounded-lg p-6">
+<div class="py-6">
+        <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+            <div class="max-w-4xl bg-white p-6 shadow-sm sm:rounded-lg">
                 <form method="POST" action="{{ route('meetings.store') }}">
                     @csrf
                     @error('preflight_token')<p class="mb-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">{{ $message }}</p>@enderror
@@ -15,7 +14,7 @@
                     </div>
                     <div class="mt-6 flex justify-end gap-3">
                         <a href="{{ route('meetings.index') }}" class="rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-widest text-gray-700 shadow-sm">Cancelar</a>
-                        <button type="submit" formaction="{{ route('meetings.preview') }}" class="rounded-md bg-gray-800 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white hover:bg-gray-700">Analisar investimento</button>
+                        <button type="submit" formaction="{{ route('meetings.preview') }}" class="rounded-md bg-teal-700 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white hover:bg-teal-800">Analisar investimento</button>
                     </div>
                 </form>
             </div>

@@ -1,47 +1,28 @@
 <x-app-layout>
-    <x-slot name="header">
-        <div class="flex items-center justify-between gap-4 rounded-lg bg-gray-100 px-4 py-3 shadow-sm">
-            <div class="flex flex-wrap gap-3">
-                @can('participants.create')
-                    <a href="{{ route('participants.create') }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-teal-700 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white transition hover:bg-teal-800">
-                        Novo participante
-                    </a>
-                @endcan
-            </div>
-        </div>
-    </x-slot>
-
     <div class="py-6">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <nav class="mb-6 flex gap-2 border-b border-gray-200" aria-label="Gestão de participantes">
-                @can('manage-users')
-                @endcan
-                @can('participants.view')
-                    <a href="{{ route('participants.index') }}" @class(['border-b-2 px-4 py-3 text-sm font-semibold', 'border-teal-600 text-teal-800' => request()->routeIs('participants.*'), 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' => ! request()->routeIs('participants.*')]) @if(request()->routeIs('participants.*')) aria-current="page" @endif>Participantes</a>
-                @endcan
-                @can('manage-structure')
-                    <a href="{{ route('teams.index') }}" @class(['border-b-2 px-4 py-3 text-sm font-semibold', 'border-teal-600 text-teal-800' => request()->routeIs('teams.*'), 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' => ! request()->routeIs('teams.*')]) @if(request()->routeIs('teams.*')) aria-current="page" @endif>Equipes</a>
-                @endcan
-            </nav>
             @if (session('success'))
                 <div class="mb-4 rounded-md bg-green-100 border border-green-200 text-green-800 px-4 py-3">
                     {{ session('success') }}
                 </div>
             @endif
 
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4 mb-6">
-                <form method="GET" action="{{ route('participants.index') }}" class="flex flex-col md:flex-row gap-3">
-                    <input type="text" name="search" value="{{ $search }}" placeholder="Buscar por nome, e-mail ou telefone" class="w-full md:w-2/3 rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
-                    <select name="status" class="w-full md:w-1/4 rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
+            <div class="mb-6 flex flex-col gap-3 overflow-hidden bg-white p-4 shadow-sm sm:rounded-lg lg:flex-row lg:items-center lg:justify-between">
+                <form method="GET" action="{{ route('participants.index') }}" class="flex min-w-0 flex-1 flex-col gap-3 md:flex-row">
+                    <input type="text" name="search" value="{{ $search }}" placeholder="Buscar por nome, e-mail ou telefone" class="h-11 w-full min-w-0 flex-1 rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
+                    <select name="status" class="h-11 w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 md:flex-1">
                         <option value="all" {{ $statusFilter === 'all' ? 'selected' : '' }}>Todos</option>
                         <option value="active" {{ $statusFilter === 'active' ? 'selected' : '' }}>Ativos</option>
                         <option value="pending" {{ $statusFilter === 'pending' ? 'selected' : '' }}>Pendentes</option>
                         <option value="inactive" {{ $statusFilter === 'inactive' ? 'selected' : '' }}>Inativos</option>
                     </select>
-                    <button type="submit" class="inline-flex items-center justify-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                    <button type="submit" class="inline-flex h-11 min-h-[2.65rem] shrink-0 items-center justify-center whitespace-nowrap rounded-md bg-gray-800 px-4 text-xs font-semibold uppercase tracking-widest text-white transition hover:bg-gray-700">
                         Buscar
                     </button>
                 </form>
+                @can('participants.create')
+                    <a href="{{ route('participants.create') }}" class="inline-flex h-11 min-h-[2.65rem] shrink-0 items-center justify-center whitespace-nowrap rounded-md bg-teal-700 px-4 text-xs font-semibold uppercase tracking-widest text-white transition hover:bg-teal-800">Novo participante</a>
+                @endcan
             </div>
 
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
@@ -79,7 +60,7 @@
                                             @if($participant->status === 'active') bg-green-100 text-green-800
                                             @elseif($participant->status === 'pending') bg-yellow-100 text-yellow-800
                                             @else bg-red-100 text-red-800 @endif">
-                                            {{ $participant->status }}
+                                            {{ ['active' => 'Ativo', 'pending' => 'Pendente', 'inactive' => 'Inativo'][$participant->status] ?? $participant->status }}
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -104,6 +85,7 @@
                     </table>
                 </div>
             </div>
+            <div class="mt-4">{{ $participants->links() }}</div>
         </div>
     </div>
 </x-app-layout>

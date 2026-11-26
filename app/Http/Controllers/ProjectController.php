@@ -11,12 +11,21 @@ use Illuminate\View\View;
 
 class ProjectController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
         abort_unless(Auth::user()->hasPermission('projects.view'), 403);
+        $search = trim((string) $request->query('search', ''));
+        $projectsQuery = Project::query()->withCount('meetings')->orderBy('name');
+
+        if ($search !== '') {
+            $projectsQuery->where(fn ($query) => $query
+                ->where('name', 'like', '%'.$search.'%')
+                ->orWhere('code', 'like', '%'.$search.'%'));
+        }
 
         return view('projects.index', [
-            'projects' => Project::query()->withCount('meetings')->orderBy('name')->get(),
+            'projects' => $projectsQuery->get(),
+            'search' => $search,
         ]);
     }
 

@@ -1,6 +1,5 @@
 <x-app-layout>
-    <x-slot name="header"><h2 class="font-semibold text-xl text-gray-800 leading-tight">Histórico de acessos</h2></x-slot>
-    <div class="py-6">
+<div class="py-6">
         <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
             <div class="mb-4"><a href="{{ route('access-profiles.index') }}" class="text-teal-700">Voltar aos perfis</a></div>
             <div class="overflow-x-auto rounded bg-white shadow">

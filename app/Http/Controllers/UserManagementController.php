@@ -22,7 +22,9 @@ class UserManagementController extends Controller
 {
     public function index(Request $request): View
     {
-        $query = User::with(['supervisors' => fn ($query) => $query->orderBy('name')])->latest();
+        $query = User::with(['supervisors' => fn ($query) => $query->orderBy('name')])
+            ->orderByRaw("CASE WHEN status = 'inactive' THEN 1 ELSE 0 END")
+            ->latest();
 
         if ($request->filled('search')) {
             $search = trim($request->search);
@@ -37,17 +39,12 @@ class UserManagementController extends Controller
             $query->where('status', $request->status);
         }
 
-        if ($request->filled('role') && $request->role !== 'all') {
-            $query->where('role', $request->role);
-        }
-
-        $users = $query->get();
+        $users = $query->paginate(10)->withQueryString();
 
         return view('users.index', [
             'users' => $users,
             'search' => $request->search ?? '',
             'statusFilter' => $request->status ?? 'all',
-            'roleFilter' => $request->role ?? 'all',
         ]);
     }
 

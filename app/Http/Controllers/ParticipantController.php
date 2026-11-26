@@ -27,6 +27,7 @@ class ParticipantController extends Controller
 
         $query = Participant::with(['user.supervisors', 'memberUser.team.directorate'])
             ->when(! $request->user()->can('manage-users'), fn ($query) => $query->where('user_id', Auth::id()))
+            ->orderByRaw("CASE WHEN status = 'inactive' THEN 1 ELSE 0 END")
             ->latest();
 
         if ($request->filled('search')) {
@@ -43,7 +44,7 @@ class ParticipantController extends Controller
             $query->where('status', $request->status);
         }
 
-        $participants = $query->get();
+        $participants = $query->paginate(10)->withQueryString();
 
         return view('participants.index', [
             'participants' => $participants,

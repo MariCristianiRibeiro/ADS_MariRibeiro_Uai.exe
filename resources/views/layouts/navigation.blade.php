@@ -13,10 +13,8 @@
         :class="{ 'lg:w-20': sidebarCollapsed, 'lg:w-64': !sidebarCollapsed, 'translate-x-0': mobileOpen, '-translate-x-full': !mobileOpen }"
         aria-label="Menu principal"
     >
-        <div class="flex h-16 shrink-0 items-center justify-between border-b border-slate-100 px-3 lg:px-4" :class="sidebarCollapsed ? 'lg:justify-center' : ''">
-            <a href="{{ route('dashboard') }}" class="flex min-w-0 items-center gap-3" :class="sidebarCollapsed ? 'lg:hidden' : ''" aria-label="Uai - início">
-                <span class="text-2xl font-extrabold tracking-tight text-teal-800">Uai</span>
-            </a>
+        <div class="flex h-16 shrink-0 items-center justify-end border-b border-slate-100 px-3 lg:px-4" :class="sidebarCollapsed ? 'lg:justify-center' : ''">
+            
             <button
                 type="button"
                 class="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 lg:flex"

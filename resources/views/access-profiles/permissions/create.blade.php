@@ -1,8 +1,7 @@
 <x-app-layout>
-    <x-slot name="header"><h2 class="font-semibold text-xl text-gray-800 leading-tight">Nova permissão</h2></x-slot>
-    <div class="py-6">
-        <div class="mx-auto max-w-3xl sm:px-6 lg:px-8">
-            <form method="POST" action="{{ route('access-profiles.permissions.store') }}" class="space-y-6 rounded bg-white p-6 shadow">
+<div class="py-6">
+        <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+            <form method="POST" action="{{ route('access-profiles.permissions.store') }}" class="max-w-3xl space-y-6 rounded bg-white p-6 shadow">
                 @csrf
                 <p class="text-sm text-gray-600">Cadastre uma permissão para incluí-la nos perfis. Para proteger uma nova funcionalidade, ela também precisa verificar esta permissão no código da aplicação.</p>
                 <div>

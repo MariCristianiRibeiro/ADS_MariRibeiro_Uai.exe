@@ -1,20 +1,4 @@
 <x-app-layout>
-    <x-slot name="header">
-        <div class="flex items-center justify-between gap-4 rounded-lg bg-gray-100 px-4 py-3 shadow-sm">
-            <h2 class="font-bold text-xl text-black leading-tight">
-                Reuniões
-            </h2>
-            <div class="flex flex-wrap gap-3">
-                <a href="{{ route('projects.index') }}" class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-widest text-gray-700 shadow-sm transition hover:bg-gray-50">
-                    Projetos
-                </a>
-                <a href="{{ route('meetings.create') }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-gray-800 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white transition hover:bg-gray-700">
-                    Nova reunião
-                </a>
-            </div>
-        </div>
-    </x-slot>
-
     <div class="py-6">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             @if (session('success'))
@@ -23,10 +7,10 @@
                 </div>
             @endif
 
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4 mb-6">
-                <form method="GET" action="{{ route('meetings.index') }}" class="flex flex-col md:flex-row gap-3">
-                    <input type="text" name="search" value="{{ $search }}" placeholder="Buscar por título, local ou observações" class="w-full md:w-2/3 rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
-                    <select name="status" class="w-full md:w-1/4 rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
+            <div class="mb-6 flex flex-col gap-3 overflow-hidden bg-white p-4 shadow-sm sm:rounded-lg lg:flex-row lg:items-center lg:justify-between">
+                <form method="GET" action="{{ route('meetings.index') }}" class="flex min-w-0 flex-1 flex-col gap-3 md:flex-row">
+                    <input type="text" name="search" value="{{ $search }}" placeholder="Buscar por título, local ou observações" class="h-11 w-full min-w-0 flex-1 rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
+                    <select name="status" class="h-11 w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 md:flex-1">
                         <option value="all" {{ $statusFilter === 'all' ? 'selected' : '' }}>Todos</option>
                         <option value="draft" {{ $statusFilter === 'draft' ? 'selected' : '' }}>Rascunhos</option>
                         <option value="scheduled" {{ $statusFilter === 'scheduled' ? 'selected' : '' }}>Agendadas</option>
@@ -34,8 +18,9 @@
                         <option value="completed" {{ $statusFilter === 'completed' ? 'selected' : '' }}>Concluídas</option>
                         <option value="canceled" {{ $statusFilter === 'canceled' ? 'selected' : '' }}>Canceladas</option>
                     </select>
-                    <button type="submit" class="inline-flex items-center justify-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition ease-in-out duration-150">Filtrar</button>
+                    <button type="submit" class="inline-flex h-11 min-h-[2.65rem] shrink-0 items-center justify-center whitespace-nowrap rounded-md bg-gray-800 px-4 text-xs font-semibold uppercase tracking-widest text-white transition hover:bg-gray-700">Buscar</button>
                 </form>
+                <a href="{{ route('meetings.create') }}" class="inline-flex h-11 min-h-[2.65rem] shrink-0 items-center justify-center whitespace-nowrap rounded-md bg-teal-700 px-4 text-xs font-semibold uppercase tracking-widest text-white transition hover:bg-teal-800">Nova reunião</a>
             </div>
 
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">

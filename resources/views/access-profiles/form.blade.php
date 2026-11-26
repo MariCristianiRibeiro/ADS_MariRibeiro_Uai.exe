@@ -1,6 +1,5 @@
 <x-app-layout>
-    <x-slot name="header"><h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ $profile->exists ? 'Editar perfil' : 'Novo perfil' }}</h2></x-slot>
-    <div class="py-6"><div class="mx-auto max-w-4xl sm:px-6 lg:px-8"><form method="POST" action="{{ $profile->exists ? route('access-profiles.update', $profile) : route('access-profiles.store') }}" class="space-y-6 rounded bg-white p-6 shadow">@csrf @if ($profile->exists) @method('PUT') @endif
+    <div class="py-6"><div class="mx-auto max-w-7xl sm:px-6 lg:px-8"><form method="POST" action="{{ $profile->exists ? route('access-profiles.update', $profile) : route('access-profiles.store') }}" class="max-w-4xl space-y-6 rounded bg-white p-6 shadow">@csrf @if ($profile->exists) @method('PUT') @endif
         <div><label class="block text-sm font-medium">Nome</label><input name="name" required maxlength="255" value="{{ old('name', $profile->name) }}" class="mt-1 w-full rounded border-gray-300">@error('name')<p class="text-sm text-red-600">{{ $message }}</p>@enderror</div>
         <div><label class="block text-sm font-medium">Descrição</label><textarea name="description" class="mt-1 w-full rounded border-gray-300">{{ old('description', $profile->description) }}</textarea>@error('description')<p class="text-sm text-red-600">{{ $message }}</p>@enderror</div>
         @if ($profile->exists)<label class="flex items-center gap-2"><input type="checkbox" name="active" value="1" @checked(old('active', $profile->active))> Perfil ativo</label>@endif

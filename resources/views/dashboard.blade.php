@@ -1,12 +1,12 @@
 <x-app-layout>
-    <div x-data="{ duration: 60, people: 4, rate: 150 }" class="dashboard-shell min-h-[calc(100vh-4rem)] py-3">
-        <div class="mx-auto flex min-h-[calc(100vh-10rem)] max-w-7xl flex-col px-4 sm:px-6 lg:px-8">
+    <div x-data="{ duration: 60, people: 4, rate: 150 }" class="dashboard-shell min-h-[calc(100vh-6rem)] py-2">
+        <div class="mx-auto flex min-h-[calc(100vh-12rem)] max-w-7xl flex-col px-4 sm:px-6 lg:px-8">
             <div class="mb-3 flex flex-col justify-between gap-3 md:flex-row md:items-end">
                 <div>
                     <p class="dashboard-kicker">Cronômetro</p>
-                    <h1 class="dashboard-title">Seu tempo vale muito</h1>
+                    <h1 class="sr-only">Seu tempo vale muito</h1>
                 </div>
-                <a href="{{ route('meetings.create') }}" class="dashboard-action">+ Agendar reunião</a>
+                <a href="{{ route('meetings.create') }}" class="dashboard-action dashboard-create-action">+ Agendar reunião</a>
             </div>
 
             <div class="{{ $dashboardMeetings->isEmpty() ? 'flex flex-1 flex-col gap-6' : '' }}">
@@ -14,7 +14,6 @@
                 <div>
                     <p class="mt-2 text-sm leading-6 text-slate-600">Agende uma reunião ou consulte as registradas.</p>
                 </div>
-
                 @if ($dashboardMeetings->isNotEmpty())
                     <div x-data="dashboardMeetingTimer(@js($dashboardMeetings), @js($selectedMeetingId))" class="mt-6">
                         <label for="dashboard-meeting" class="block text-sm font-medium text-slate-700">Reunião</label>
@@ -76,10 +75,9 @@
             <section class="summary-panel {{ $dashboardMeetings->isEmpty() ? 'flex-1' : 'mb-6' }}" aria-labelledby="meeting-investment-title">
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                     <div>
-                        <p class="panel-overline text-teal-100">Seu painel hoje</p>
-                        <h2 id="meeting-investment-title" class="mt-2 text-xl font-semibold tracking-tight text-white sm:text-2xl">Investimento real em reuniões</h2>
+                        <p class="panel-overline text-teal-100">Painel hoje</p>
+                        <h2 id="meeting-investment-title" class="mt-2 text-xl font-semibold tracking-tight text-white sm:text-2xl">Investimento em reuniões</h2>
                     </div>
-                    <p class="text-xs text-teal-100">Apurado pelas durações registradas e presenças confirmadas</p>
                 </div>
 
                 <div class="mt-6 grid gap-3 md:grid-cols-3 md:gap-4">
@@ -100,6 +98,7 @@
                         </article>
                     @endforeach
                 </div>
+                <p class="mt-3 text-right text-xs text-teal-100">Apurado pelas durações registradas e presenças confirmadas</p>
 
             </section>
             </div>

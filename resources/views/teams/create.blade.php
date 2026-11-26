@@ -1,11 +1,7 @@
 <x-app-layout>
-    <x-slot name="header">
-        <h2 class="text-xl font-semibold leading-tight text-gray-800">{{ $team->exists ? 'Editar equipe' : 'Cadastrar equipe' }}</h2>
-    </x-slot>
-
-    <div class="py-6">
-        <div class="mx-auto max-w-2xl sm:px-6 lg:px-8">
-            <div class="overflow-hidden bg-white p-6 shadow-sm sm:rounded-lg">
+<div class="py-6">
+        <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+            <div class="max-w-2xl overflow-hidden bg-white p-6 shadow-sm sm:rounded-lg">
                 <form method="POST" action="{{ $team->exists ? route('teams.update', $team) : route('teams.store') }}" class="space-y-6">
                     @csrf
                     @if ($team->exists)

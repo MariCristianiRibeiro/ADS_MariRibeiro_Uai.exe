@@ -1,11 +1,8 @@
 <x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">Novo usuário</h2>
-    </x-slot>
 
-    <div class="py-6">
-        <div class="mx-auto max-w-3xl sm:px-6 lg:px-8">
-            <div class="overflow-hidden bg-white p-6 shadow-sm sm:rounded-lg" x-data="userHierarchyForm()">
+<div class="py-6">
+        <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+            <div class="max-w-3xl overflow-hidden bg-white p-6 shadow-sm sm:rounded-lg" x-data="userHierarchyForm()">
                 <form method="POST" action="{{ route('users.store') }}" class="grid grid-cols-1 gap-6">
                     @csrf
                     <div><label for="name" class="block text-sm font-medium text-gray-700">Nome</label><input id="name" name="name" value="{{ old('name') }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">@error('name')<span class="text-sm text-red-600">{{ $message }}</span>@enderror</div>
