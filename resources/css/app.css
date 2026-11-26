@@ -67,6 +67,8 @@ main .overflow-hidden.bg-white.rounded-lg, main .overflow-hidden.bg-white.rounde
 main table thead { background-color: var(--surface-soft); }
 main table tbody tr { transition: background-color .15s ease; }
 main table tbody tr:hover > td { background-color: #e5e7eb !important; }
+main table tbody tr.clickable-table-row { cursor: pointer; }
+main table tbody tr.clickable-table-row:focus-visible > td { outline: 2px solid rgba(15, 118, 110, .45); outline-offset: -2px; }
 main form label { line-height: 1.45; }
 main form button[type="submit"] { min-height: 2.65rem; border-radius: .5rem; font-weight: 650; transition: background-color .15s ease, box-shadow .15s ease, transform .15s ease; }
 main form button[type="submit"]:not(.bg-red-600):not(.bg-red-700):not(.bg-rose-600):not(.bg-rose-700):not(.bg-amber-600):not(.bg-amber-700):not(.bg-teal-700):not(.bg-transparent) { background-color: var(--ink); }

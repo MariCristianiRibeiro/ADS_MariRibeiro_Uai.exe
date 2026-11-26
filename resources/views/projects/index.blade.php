@@ -27,13 +27,15 @@
                                 <tr>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Projeto</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Reuniões vinculadas</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Ações</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200 bg-white">
                                 @foreach ($projects as $project)
-                                    <tr>
+                                    <tr class="clickable-table-row" role="link" tabindex="0" onclick="if (!event.target.closest('a, button, form')) window.location.href='{{ route('projects.show', $project) }}'" onkeydown="if (event.key === 'Enter') window.location.href='{{ route('projects.show', $project) }}'">
                                         <td class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">{{ $project->name }}</td>
                                         <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-600">{{ $project->meetings_count }}</td>
+                                        <td class="whitespace-nowrap px-6 py-4 text-sm"><a href="{{ route('projects.show', $project) }}" class="text-teal-700 hover:text-teal-900">Detalhes</a></td>
                                     </tr>
                                 @endforeach
                             </tbody>

@@ -60,7 +60,7 @@
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
                             @forelse ($participants as $participant)
-                                <tr>
+                                <tr class="clickable-table-row" role="link" tabindex="0" onclick="if (!event.target.closest('a, button, form')) window.location.href='{{ route('participants.edit', $participant) }}'" onkeydown="if (event.key === 'Enter') window.location.href='{{ route('participants.edit', $participant) }}'">
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ $participant->name }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $participant->email }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $participant->phone ?? '-' }}</td>

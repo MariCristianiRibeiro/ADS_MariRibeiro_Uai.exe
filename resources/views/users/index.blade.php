@@ -71,7 +71,7 @@
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
                             @forelse ($users as $user)
-                                <tr>
+                                <tr class="clickable-table-row" role="link" tabindex="0" onclick="if (!event.target.closest('a, button, form')) window.location.href='{{ route('users.edit', $user) }}'" onkeydown="if (event.key === 'Enter') window.location.href='{{ route('users.edit', $user) }}'">
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ $user->name }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $user->email }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{{ ['admin' => 'Administrador geral', 'hr' => 'RH', 'executive' => 'Executiva', 'director' => 'Diretor', 'director_commercial' => 'Diretor Comercial', 'director_network' => 'Diretor de Rede', 'manager' => 'Gestor', 'participant' => 'Colaborador'][$user->role] ?? 'Colaborador' }}</td>

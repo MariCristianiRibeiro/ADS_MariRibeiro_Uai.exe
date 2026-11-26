@@ -52,7 +52,7 @@
                             </thead>
                             <tbody class="divide-y divide-gray-200 bg-white">
                                 @foreach ($teams as $team)
-                                    <tr>
+                                    <tr class="clickable-table-row" role="link" tabindex="0" onclick="if (!event.target.closest('a, button, form')) window.location.href='{{ route('teams.edit', $team) }}'" onkeydown="if (event.key === 'Enter') window.location.href='{{ route('teams.edit', $team) }}'">
                                         <td class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">{{ $team->name }}</td>
                                         <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-600">{{ $team->directorate->name }}</td>
                                         <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-600">{{ $team->members_count }}</td>

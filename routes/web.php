@@ -28,6 +28,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('participants', ParticipantController::class)->except(['show'])->middleware('permission:participants.view');
     Route::get('/projects', [ProjectController::class, 'index'])->middleware('permission:projects.view')->name('projects.index');
     Route::get('/projects/create', [ProjectController::class, 'create'])->middleware('permission:projects.create')->name('projects.create');
+    Route::get('/projects/{project}', [ProjectController::class, 'show'])->middleware('permission:projects.view')->name('projects.show');
     Route::post('/projects', [ProjectController::class, 'store'])->middleware('permission:projects.create')->name('projects.store');
     Route::get('/meetings/{meeting}/closeout', [MeetingController::class, 'closeout'])->middleware('permission:meetings.view')->name('meetings.closeout');
     Route::post('/meetings/{meeting}/timer/start', [MeetingController::class, 'startTimer'])->middleware('permission:meetings.view')->name('meetings.timer.start');

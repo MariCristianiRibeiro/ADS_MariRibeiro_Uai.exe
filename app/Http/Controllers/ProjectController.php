@@ -20,6 +20,15 @@ class ProjectController extends Controller
         ]);
     }
 
+    public function show(Project $project): View
+    {
+        abort_unless(Auth::user()->hasPermission('projects.view'), 403);
+
+        $project->load(['team', 'manager', 'meetings' => fn ($query) => $query->orderByDesc('date')->orderByDesc('time')]);
+
+        return view('projects.show', compact('project'));
+    }
+
     public function create(Request $request): View
     {
         abort_unless($request->user()->hasPermission('projects.create'), 403);
