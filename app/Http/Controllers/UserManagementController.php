@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AccessProfile;
 use App\Models\Directorate;
 use App\Models\JobPosition;
+use App\Models\Meeting;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\AccessControlService;
@@ -160,6 +161,35 @@ class UserManagementController extends Controller
         });
 
         return redirect()->route('users.index')->with('success', 'Usuário atualizado com sucesso.');
+    }
+
+    public function destroy(User $user): RedirectResponse
+    {
+        abort_unless(auth()->user()->can('manage-users'), 403);
+
+        if ($user->is(auth()->user())) {
+            return redirect()->route('users.index')->withErrors(['user' => 'NÃ£o Ã© possÃ­vel excluir sua prÃ³pria conta.']);
+        }
+
+        if ($user->role === 'admin' && User::where('role', 'admin')->count() <= 1) {
+            return redirect()->route('users.index')->withErrors(['user' => 'O Ãºltimo administrador nÃ£o pode ser excluÃ­do.']);
+        }
+
+        $hasLinkedHistory = Meeting::where('user_id', $user->id)->exists()
+            || $user->meetings()->exists()
+            || $user->meetingParticipants()->exists()
+            || $user->participants()->exists()
+            || $user->participantProfile()->exists()
+            || $user->subordinates()->exists()
+            || $user->supervisors()->exists();
+
+        if ($hasLinkedHistory) {
+            return redirect()->route('users.index')->withErrors(['user' => 'Esta conta possui participantes, reuniÃµes ou histÃ³ricos vinculados. Altere o status para inativo para preservar os dados.']);
+        }
+
+        $user->delete();
+
+        return redirect()->route('users.index')->with('success', 'Conta removida com sucesso.');
     }
 
     private function structureOptions(?int $exceptUserId = null): array

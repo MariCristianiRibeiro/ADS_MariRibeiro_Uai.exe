@@ -55,6 +55,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/users', [UserManagementController::class, 'store'])->name('users.store');
         Route::get('/users/{user}/edit', [UserManagementController::class, 'edit'])->name('users.edit');
         Route::put('/users/{user}', [UserManagementController::class, 'update'])->name('users.update');
+        Route::delete('/users/{user}', [UserManagementController::class, 'destroy'])->name('users.destroy');
     });
 
     Route::middleware('can:manage-access-profiles')->group(function () {
@@ -73,6 +74,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
         Route::get('/teams/create', [TeamController::class, 'create'])->name('teams.create');
         Route::post('/teams', [TeamController::class, 'store'])->name('teams.store');
+        Route::get('/teams/{team}/edit', [TeamController::class, 'edit'])->name('teams.edit');
+        Route::put('/teams/{team}', [TeamController::class, 'update'])->name('teams.update');
+        Route::delete('/teams/{team}', [TeamController::class, 'destroy'])->name('teams.destroy');
         Route::get('/job-positions', [JobPositionController::class, 'index'])->middleware('permission:job_positions.view')->name('job-positions.index');
         Route::get('/job-positions/create', [JobPositionController::class, 'create'])->middleware('permission:job_positions.create')->name('job-positions.create');
         Route::post('/job-positions', [JobPositionController::class, 'store'])->middleware('permission:job_positions.create')->name('job-positions.store');

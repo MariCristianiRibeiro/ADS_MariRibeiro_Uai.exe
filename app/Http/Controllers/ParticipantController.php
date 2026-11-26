@@ -26,7 +26,7 @@ class ParticipantController extends Controller
         abort_unless($request->user()->hasPermission('participants.view'), 403);
 
         $query = Participant::with(['user.supervisors', 'memberUser.team.directorate'])
-            ->where('user_id', Auth::id())
+            ->when(! $request->user()->can('manage-users'), fn ($query) => $query->where('user_id', Auth::id()))
             ->latest();
 
         if ($request->filled('search')) {

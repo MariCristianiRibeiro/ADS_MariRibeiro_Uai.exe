@@ -31,18 +31,6 @@
                             <path d="M4 6.75h16M4 12h16M4 17.25h16" stroke-linecap="round" stroke-width="1.8" />
                         </svg>
                     </button>
-                    <button
-                        type="button"
-                        class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 lg:flex"
-                        @click="sidebarCollapsed = !sidebarCollapsed"
-                        aria-label="Recolher ou expandir menu"
-                        :aria-expanded="!sidebarCollapsed"
-                    >
-                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                            <rect x="3.75" y="4.75" width="16.5" height="14.5" rx="2" stroke-width="1.6" />
-                            <path d="M9 5v14m4.5-9 2 2-2 2" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" />
-                        </svg>
-                    </button>
                     @isset($header)
                         <div class="app-page-heading min-w-0 flex-1">
                             {{ $header }}

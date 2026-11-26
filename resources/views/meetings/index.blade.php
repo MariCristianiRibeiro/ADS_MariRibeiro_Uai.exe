@@ -47,41 +47,27 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hora</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Local</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Participantes</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tempo previsto / real</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Presença</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
                             @forelse ($meetings as $meeting)
-                                <tr>
+                                <tr
+                                    class="cursor-pointer transition-colors hover:bg-gray-200 focus-visible:bg-gray-200"
+                                    role="link"
+                                    tabindex="0"
+                                    onclick="if (!event.target.closest('a, button, form')) window.location.href='{{ route('meetings.show', $meeting) }}'"
+                                    onkeydown="if (event.key === 'Enter') window.location.href='{{ route('meetings.show', $meeting) }}'"
+                                >
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ $meeting->title }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $meeting->date?->format('d/m/Y') }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $meeting->time ?? '-' }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $meeting->location ?? '-' }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                        @php
-                                            $attendees = $meeting->users->isNotEmpty() ? $meeting->users : $meeting->participants;
-                                        @endphp
-                                        @if($attendees->isNotEmpty())
-                                            {{ $attendees->pluck('name')->implode(', ') }}
-                                        @else
-                                            -
-                                        @endif
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                                         <div>Previsto: {{ number_format($meeting->duration_minutes / 60, 2, ',', '.') }} h</div>
                                         <div>Real: {{ $meeting->actual_duration_seconds === null ? 'Não registrado' : number_format($meeting->actual_duration_seconds / 3600, 2, ',', '.') . ' h' }}</div>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                        @php
-                                            $confirmedCount = $attendees->where('pivot.attendance_status', 'confirmed')->count();
-                                            $absentCount = $attendees->where('pivot.attendance_status', 'absent')->count();
-                                            $pendingCount = $attendees->where('pivot.attendance_status', 'pending')->count();
-                                        @endphp
-                                        {{ $confirmedCount }} confirmada(s), {{ $absentCount }} ausente(s), {{ $pendingCount }} pendente(s)
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm">
                                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
@@ -109,7 +95,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="9" class="px-6 py-8 text-center text-sm text-gray-500">Nenhuma reunião cadastrada.</td>
+                                    <td colspan="7" class="px-6 py-8 text-center text-sm text-gray-500">Nenhuma reunião cadastrada.</td>
                                 </tr>
                             @endforelse
                         </tbody>

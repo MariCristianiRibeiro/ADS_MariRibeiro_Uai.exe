@@ -33,7 +33,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Gate::define('manage-structure', function ($user) {
-            return $user && collect(['teams.view', 'teams.create', 'job_positions.view', 'job_positions.create', 'job_positions.edit', 'job_positions.deactivate'])->contains(fn (string $permission) => $user->hasPermission($permission));
+            return $user && collect(['teams.view', 'teams.create', 'teams.manage', 'job_positions.view', 'job_positions.create', 'job_positions.edit', 'job_positions.deactivate'])->contains(fn (string $permission) => $user->hasPermission($permission));
         });
 
         Gate::define('manage-team', function ($user) {

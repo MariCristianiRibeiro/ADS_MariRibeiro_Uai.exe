@@ -1,16 +1,32 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            <span>Participantes</span>
-            <a href="{{ route('users.create') }}" class="ml-4 inline-flex items-center rounded-md bg-gray-800 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white hover:bg-gray-700">Novo participante</a>
-        </h2>
+        <div class="flex items-center justify-between gap-4 rounded-lg bg-gray-100 px-4 py-3 shadow-sm">
+            <div class="flex flex-wrap gap-3">
+                <a href="{{ route('users.create') }}" class="inline-flex items-center justify-center rounded-md bg-teal-700 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white shadow-sm transition hover:bg-teal-800">Nova conta</a>
+            </div>
+        </div>
     </x-slot>
 
     <div class="py-6">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            <nav class="mb-6 flex gap-2 border-b border-gray-200" aria-label="Gestão de participantes">
+                @can('manage-users')
+                @endcan
+                @can('participants.view')
+                    <a href="{{ route('participants.index') }}" @class(['border-b-2 px-4 py-3 text-sm font-semibold', 'border-teal-600 text-teal-800' => request()->routeIs('participants.*'), 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' => ! request()->routeIs('participants.*')]) @if(request()->routeIs('participants.*')) aria-current="page" @endif>Participantes</a>
+                @endcan
+                @can('manage-structure')
+                    <a href="{{ route('teams.index') }}" @class(['border-b-2 px-4 py-3 text-sm font-semibold', 'border-teal-600 text-teal-800' => request()->routeIs('teams.*'), 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' => ! request()->routeIs('teams.*')]) @if(request()->routeIs('teams.*')) aria-current="page" @endif>Equipes</a>
+                @endcan
+            </nav>
             @if (session('success'))
                 <div class="mb-4 rounded-md bg-green-100 border border-green-200 text-green-800 px-4 py-3">
                     {{ session('success') }}
+                </div>
+            @endif
+            @if ($errors->has('user'))
+                <div class="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-800">
+                    {{ $errors->first('user') }}
                 </div>
             @endif
 
@@ -72,6 +88,13 @@
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $user->created_at->timezone('America/Sao_Paulo')->format('d/m/Y H:i') }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                         <a href="{{ route('users.edit', $user) }}" class="text-teal-600 hover:text-teal-900">Editar</a>
+                                        @if (! $user->is(auth()->user()))
+                                            <form action="{{ route('users.destroy', $user) }}" method="POST" class="ml-3 inline">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="bg-transparent px-0 py-0 text-red-600 hover:text-red-900" onclick="return confirm('Excluir esta conta? Contas vinculadas a reuniões ou históricos não podem ser removidas.')">Excluir</button>
+                                            </form>
+                                        @endif
                                     </td>
                                 </tr>
                             @empty

@@ -1,19 +1,18 @@
 <x-app-layout>
-    <div x-data="{ duration: 60, people: 4, rate: 150 }" class="dashboard-shell min-h-[calc(100vh-4rem)] py-8 sm:py-12">
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div class="mb-10 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+    <div x-data="{ duration: 60, people: 4, rate: 150 }" class="dashboard-shell min-h-[calc(100vh-4rem)] py-3">
+        <div class="mx-auto flex min-h-[calc(100vh-10rem)] max-w-7xl flex-col px-4 sm:px-6 lg:px-8">
+            <div class="mb-3 flex flex-col justify-between gap-3 md:flex-row md:items-end">
                 <div>
-                    <p class="dashboard-kicker">Central de reuniões</p>
+                    <p class="dashboard-kicker">Cronômetro</p>
                     <h1 class="dashboard-title">Seu tempo vale muito</h1>
                 </div>
                 <a href="{{ route('meetings.create') }}" class="dashboard-action">+ Agendar reunião</a>
             </div>
 
-            <section class="calculator-panel mb-6" aria-labelledby="meeting-timer-title">
+            <div class="{{ $dashboardMeetings->isEmpty() ? 'flex flex-1 flex-col gap-6' : '' }}">
+            <section class="calculator-panel {{ $dashboardMeetings->isEmpty() ? 'flex-1' : 'mb-6' }}" aria-label="Cronômetro da reunião">
                 <div>
-                    <p class="panel-overline">Acompanhe em tempo real</p>
-                    <h2 id="meeting-timer-title" class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Cronômetro da reunião</h2>
-                    <p class="mt-2 text-sm leading-6 text-slate-600">Selecione uma reunião criada por você para contabilizar o tempo e o investimento realizado.</p>
+                    <p class="mt-2 text-sm leading-6 text-slate-600">Agende uma reunião ou consulte as registradas.</p>
                 </div>
 
                 @if ($dashboardMeetings->isNotEmpty())
@@ -30,7 +29,7 @@
                                 <div>
                                     <p class="text-sm font-semibold uppercase tracking-[0.18em] text-teal-300">Investimento acumulado</p>
                                     <p class="mt-3 text-5xl font-bold tabular-nums tracking-tight text-white sm:text-6xl lg:text-7xl" x-text="formatCurrency(investedValue)">R$ 0,00</p>
-                                    <p class="mt-2 text-xs text-slate-400">Calculado pelo valor-hora das presenças confirmadas.</p>
+                                    <p class="mt-2 text-xs text-slate-400">Com base nas presenças confirmadas.</p>
                                 </div>
                             @endif
                             <div>
@@ -47,14 +46,14 @@
                                         <span x-text="isRunning ? 'Pausar' : (selectedMeeting?.actualDurationSeconds > 0 ? 'Retomar cronômetro' : 'Iniciar cronômetro')">Iniciar cronômetro</span>
                                     </button>
                                 </div>
-                                <p class="mt-2 text-sm text-slate-400"><span x-text="attendedCount"></span> participante(s) com presença contabilizada</p>
+                                <p class="mt-2 text-sm text-slate-400"><span x-text="attendedCount"></span> <span x-text="attendedCount === 1 ? 'presença contabilizada' : 'presenças contabilizadas'"></span></p>
                             </div>
                         </div>
 
                         <div class="mt-5 flex flex-col gap-4">
-                            <p x-show="isRunning" class="text-sm font-medium text-green-700">O cronômetro continua contando mesmo se você atualizar a página.</p>
-                            <p x-show="canClosePast" class="text-sm font-medium text-amber-800">Esta agenda venceu e não pode ser iniciada com a data antiga. Você pode encerrá-la informando o motivo e os dados de conclusão, ou reagendá-la.</p>
-                            <p x-show="selectedMeeting?.status === 'completed'" class="text-sm font-medium text-slate-600">Reunião encerrada. O tempo e o investimento foram salvos para os relatórios.</p>
+                            <p x-show="isRunning" class="text-sm font-medium text-green-700">O cronômetro continua após atualizar a página.</p>
+                            <p x-show="canClosePast" class="text-sm font-medium text-amber-800">Agenda vencida. Encerre-a com os dados da reunião ou reagende.</p>
+                            <p x-show="selectedMeeting?.status === 'completed'" class="text-sm font-medium text-slate-600">Reunião encerrada. Tempo e investimento salvos nos relatórios.</p>
                             <p x-show="error" class="text-sm font-medium text-red-700" x-text="error"></p>
                             <div class="flex flex-col items-stretch gap-3 sm:items-end">
                                 <div x-show="canClosePast" class="flex flex-col gap-3 sm:flex-row">
@@ -69,13 +68,12 @@
                     </div>
                 @else
                     <div class="mt-6 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center">
-                        <p class="font-medium text-slate-800">Você não tem reuniões agendadas para o futuro nem reuniões em andamento.</p>
-                        <p class="mt-1 text-sm text-slate-500">Agende uma reunião ou consulte os registros já existentes.</p>
+                        <p class="font-medium text-slate-800">Sem reuniões futuras ou em andamento.</p>
                     </div>
                 @endif
             </section>
 
-            <section class="summary-panel mb-6" aria-labelledby="meeting-investment-title">
+            <section class="summary-panel {{ $dashboardMeetings->isEmpty() ? 'flex-1' : 'mb-6' }}" aria-labelledby="meeting-investment-title">
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                     <div>
                         <p class="panel-overline text-teal-100">Seu painel hoje</p>
@@ -103,12 +101,8 @@
                     @endforeach
                 </div>
 
-                <div class="mt-5 flex flex-wrap gap-x-6 gap-y-2 border-t border-white/15 pt-4 text-xs text-teal-100">
-                    <span>{{ number_format($activeParticipantsCount, 0, ',', '.') }} participantes ativos</span>
-                    <span>{{ number_format($usersCount, 0, ',', '.') }} usuários cadastrados</span>
-                    <span>{{ number_format($participantsCount, 0, ',', '.') }} participantes cadastrados</span>
-                </div>
             </section>
+            </div>
 
             @if ($pastMeetings->isNotEmpty())
                 <details class="calculator-panel mb-6">

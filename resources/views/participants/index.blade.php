@@ -1,24 +1,28 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between gap-4 rounded-lg bg-gray-100 px-4 py-3 shadow-sm">
-            <h2 class="font-bold text-xl text-black leading-tight">
-                Participantes
-            </h2>
             <div class="flex flex-wrap gap-3">
-                @can('manage-structure')
-                    <a href="{{ route('teams.index') }}" class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-widest text-gray-700 shadow-sm transition hover:bg-gray-50">
-                        Equipes
+                @can('participants.create')
+                    <a href="{{ route('participants.create') }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-teal-700 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white transition hover:bg-teal-800">
+                        Novo participante
                     </a>
                 @endcan
-                <a href="{{ route('participants.create') }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-gray-800 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white transition hover:bg-gray-700">
-                    Novo participante
-                </a>
             </div>
         </div>
     </x-slot>
 
     <div class="py-6">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            <nav class="mb-6 flex gap-2 border-b border-gray-200" aria-label="Gestão de participantes">
+                @can('manage-users')
+                @endcan
+                @can('participants.view')
+                    <a href="{{ route('participants.index') }}" @class(['border-b-2 px-4 py-3 text-sm font-semibold', 'border-teal-600 text-teal-800' => request()->routeIs('participants.*'), 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' => ! request()->routeIs('participants.*')]) @if(request()->routeIs('participants.*')) aria-current="page" @endif>Participantes</a>
+                @endcan
+                @can('manage-structure')
+                    <a href="{{ route('teams.index') }}" @class(['border-b-2 px-4 py-3 text-sm font-semibold', 'border-teal-600 text-teal-800' => request()->routeIs('teams.*'), 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' => ! request()->routeIs('teams.*')]) @if(request()->routeIs('teams.*')) aria-current="page" @endif>Equipes</a>
+                @endcan
+            </nav>
             @if (session('success'))
                 <div class="mb-4 rounded-md bg-green-100 border border-green-200 text-green-800 px-4 py-3">
                     {{ session('success') }}
@@ -79,12 +83,16 @@
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <a href="{{ route('participants.edit', $participant) }}" class="text-teal-600 hover:text-teal-900 mr-3">Editar</a>
-                                        <form action="{{ route('participants.destroy', $participant) }}" method="POST" class="inline">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="text-red-600 hover:text-red-900" onclick="return confirm('Deseja excluir este participante?')">Excluir</button>
-                                        </form>
+                                        @can('participants.edit')
+                                            <a href="{{ route('participants.edit', $participant) }}" class="text-teal-600 hover:text-teal-900 mr-3">Editar</a>
+                                        @endcan
+                                        @can('participants.delete')
+                                            <form action="{{ route('participants.destroy', $participant) }}" method="POST" class="inline">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="bg-transparent px-0 py-0 text-red-600 hover:text-red-900" onclick="return confirm('Deseja excluir este participante?')">Excluir</button>
+                                            </form>
+                                        @endcan
                                     </td>
                                 </tr>
                             @empty

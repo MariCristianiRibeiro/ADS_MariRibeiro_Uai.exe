@@ -66,11 +66,11 @@ main .rounded-lg.bg-white, main .rounded-xl.bg-white, main .bg-white.rounded-lg,
 main .overflow-hidden.bg-white.rounded-lg, main .overflow-hidden.bg-white.rounded-xl { overflow: hidden; }
 main table thead { background-color: var(--surface-soft); }
 main table tbody tr { transition: background-color .15s ease; }
-main table tbody tr:hover { background-color: #f8fafc; }
+main table tbody tr:hover > td { background-color: #e5e7eb !important; }
 main form label { line-height: 1.45; }
 main form button[type="submit"] { min-height: 2.65rem; border-radius: .5rem; font-weight: 650; transition: background-color .15s ease, box-shadow .15s ease, transform .15s ease; }
-main form button[type="submit"]:not(.bg-red-600):not(.bg-red-700):not(.bg-rose-600):not(.bg-rose-700):not(.bg-amber-600):not(.bg-amber-700):not(.bg-teal-700) { background-color: var(--ink); }
-main form button[type="submit"]:not(.bg-red-600):not(.bg-red-700):not(.bg-rose-600):not(.bg-rose-700):not(.bg-amber-600):not(.bg-amber-700):not(.bg-teal-700):hover { background-color: #1e293b; }
+main form button[type="submit"]:not(.bg-red-600):not(.bg-red-700):not(.bg-rose-600):not(.bg-rose-700):not(.bg-amber-600):not(.bg-amber-700):not(.bg-teal-700):not(.bg-transparent) { background-color: var(--ink); }
+main form button[type="submit"]:not(.bg-red-600):not(.bg-red-700):not(.bg-rose-600):not(.bg-rose-700):not(.bg-amber-600):not(.bg-amber-700):not(.bg-teal-700):not(.bg-transparent):hover { background-color: #1e293b; }
 main form button[type="submit"]:disabled { cursor: not-allowed; opacity: .55; }
 main .bg-green-100, main .bg-green-50, main .bg-amber-50, main .bg-red-50, main .bg-blue-50 { border-radius: .625rem; }
 main .bg-green-100, main .bg-green-50 { border: 1px solid #bbf7d0; }

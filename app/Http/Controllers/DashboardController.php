@@ -40,9 +40,9 @@ class DashboardController extends Controller
             $canViewCosts,
         );
         $meetingInvestmentPeriods = [
-            'year' => ['label' => 'Ano vigente', 'period' => $today->format('Y')] + $periodMetrics($yearStart, $today),
-            'quarter' => ['label' => 'Trimestre vigente', 'period' => 'T'.$today->quarter.' - '.$today->format('Y')] + $periodMetrics($quarterStart, $today),
-            'month' => ['label' => 'Mes vigente', 'period' => $today->format('m/Y')] + $periodMetrics($monthStart, $today),
+            'year' => ['label' => 'Ano', 'period' => $today->format('Y')] + $periodMetrics($yearStart, $today),
+            'quarter' => ['label' => 'Trimestre', 'period' => 'T'.$today->quarter.' - '.$today->format('Y')] + $periodMetrics($quarterStart, $today),
+            'month' => ['label' => 'Mês', 'period' => $today->format('m/Y')] + $periodMetrics($monthStart, $today),
         ];
         $todayDate = $today->toDateString();
         $meetings = Meeting::query()
