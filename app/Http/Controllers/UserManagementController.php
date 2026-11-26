@@ -6,6 +6,7 @@ use App\Models\AccessProfile;
 use App\Models\Directorate;
 use App\Models\JobPosition;
 use App\Models\Meeting;
+use App\Models\Participant;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\AccessControlService;
@@ -70,10 +71,6 @@ class UserManagementController extends Controller
             'supervisor_ids.*' => ['nullable', 'integer', 'exists:users,id'],
         ];
 
-        if ($request->input('role') !== 'admin') {
-            $rules['email'][] = Rule::unique('participants', 'email');
-        }
-
         $validated = $request->validate($rules);
 
         $supervisorIds = collect($validated['supervisor_ids'] ?? [])->unique()->values();
@@ -92,13 +89,24 @@ class UserManagementController extends Controller
             }
 
             if ($user->role !== 'admin') {
-                $user->participants()->create([
+                $participant = Participant::query()->where('email', $user->email)->first();
+                $participantAttributes = [
                     'member_user_id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
                     'status' => $user->status === 'pending_finance' ? 'pending' : $user->status,
                     'role' => $user->role,
-                ]);
+                ];
+
+                if ($participant !== null) {
+                    if ($participant->member_user_id !== null && $participant->member_user_id !== $user->id) {
+                        throw ValidationException::withMessages(['email' => 'Este e-mail já está vinculado a outro acesso.']);
+                    }
+
+                    $participant->update($participantAttributes);
+                } else {
+                    $user->participants()->create($participantAttributes);
+                }
             }
         });
 
