@@ -28,7 +28,7 @@
     x-init="notify()"
 >
     <label for="participant_search" class="block text-sm font-medium text-gray-700">Participantes <x-info-tip text="Convide somente quem precisa contribuir diretamente, decidir ou executar um encaminhamento. O custo previsto é calculado com o valor-hora do cadastro." /></label>
-    <input id="participant_search" type="search" x-model="search" autocomplete="off" placeholder="Pesquisar por nome ou função" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+    <input id="participant_search" type="search" x-model="search" autocomplete="off" placeholder="Pesquisar por nome ou função" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
 
     <div x-show="search.trim().length > 0" x-cloak class="mt-1 max-h-48 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-sm">
         <template x-for="option in results" :key="option.id">

@@ -226,7 +226,7 @@ class MeetingController extends Controller
                     $meeting->time = $localNow->format('H:i');
                     $newEndTime = $localNow->copy()->addMinutes((int) ($meeting->duration_minutes ?? 0));
                     $meeting->end_time = $newEndTime->isSameDay($localNow) ? $newEndTime->format('H:i') : null;
-                    $meeting->schedule_advanced_at = now();
+                    $meeting->schedule_advanced_at = now('UTC');
                     $scheduleAdvanced = true;
                 } else {
                     abort_unless(
@@ -238,7 +238,7 @@ class MeetingController extends Controller
                     );
                 }
 
-                $meeting->timer_started_at = now();
+                $meeting->timer_started_at = now('UTC');
                 $meeting->status = 'ongoing';
                 $meeting->save();
             }
@@ -269,7 +269,7 @@ class MeetingController extends Controller
             abort_unless($meeting->user_id === Auth::id(), 403);
             abort_if($meeting->timer_started_at === null, 409, 'O cronômetro desta reunião não está em andamento.');
 
-            $elapsedSeconds = max(0, now()->timestamp - $meeting->timer_started_at->timestamp);
+            $elapsedSeconds = max(0, now('UTC')->timestamp - $meeting->timer_started_at->timestamp);
             $meeting->actual_duration_seconds = ($meeting->actual_duration_seconds ?? 0) + $elapsedSeconds;
             $meeting->timer_started_at = null;
             $meeting->save();
@@ -305,7 +305,7 @@ class MeetingController extends Controller
             );
 
             if ($meeting->timer_started_at !== null) {
-                $elapsedSeconds = max(0, now()->timestamp - $meeting->timer_started_at->timestamp);
+                $elapsedSeconds = max(0, now('UTC')->timestamp - $meeting->timer_started_at->timestamp);
                 $meeting->actual_duration_seconds = ($meeting->actual_duration_seconds ?? 0) + $elapsedSeconds;
                 $meeting->timer_started_at = null;
             }
@@ -431,7 +431,7 @@ class MeetingController extends Controller
         Cache::put($this->preflightCacheKey($request->user()->id, $preflightToken), [
             'meeting_data' => $validated,
             'analysis' => $cachedAnalysis,
-        ], now()->addMinutes(30));
+        ], now('UTC')->addMinutes(30));
 
         return view('meetings.preview', [
             'meetingData' => $validated,
@@ -685,10 +685,10 @@ class MeetingController extends Controller
         DB::transaction(function () use ($meeting, $validated, $dependencies, $request): void {
             $actionItem = $meeting->actionItems()->create($validated + ['status' => 'open']);
             $actionItem->dependencies()->sync($dependencies->all());
-            $actionItem->history()->create(['actor_id' => $request->user()->id, 'event' => 'created', 'changes' => $actionItem->only(['title', 'description', 'responsible_user_id', 'directorate_id', 'due_date', 'priority', 'expected_result']) + ['dependencies' => $dependencies->all()], 'created_at' => now()]);
+            $actionItem->history()->create(['actor_id' => $request->user()->id, 'event' => 'created', 'changes' => $actionItem->only(['title', 'description', 'responsible_user_id', 'directorate_id', 'due_date', 'priority', 'expected_result']) + ['dependencies' => $dependencies->all()], 'created_at' => now('UTC')]);
         });
 
-        return back()->with('success', 'Encaminhamento cadastrado.');
+        return back()->with('action_item_created', 'Encaminhamento cadastrado.');
     }
 
     public function updateActionItem(Request $request, Meeting $meeting, MeetingActionItem $actionItem, MeetingPredictionService $predictions): RedirectResponse
@@ -710,7 +710,7 @@ class MeetingController extends Controller
         $validated['requires_follow_up'] = $request->boolean('requires_follow_up');
         $before = $actionItem->only(array_keys($validated));
         $wasCompleted = $actionItem->status === 'completed';
-        $validated['completed_at'] = $validated['status'] === 'completed' ? ($actionItem->completed_at ?? now()) : null;
+        $validated['completed_at'] = $validated['status'] === 'completed' ? ($actionItem->completed_at ?? now('UTC')) : null;
         $changes = [];
         DB::transaction(function () use ($request, $validated, $actionItem, $before, $wasCompleted, &$changes): void {
             $actionItem->update($validated);
@@ -723,7 +723,7 @@ class MeetingController extends Controller
             }
             if ($changes !== []) {
                 $event = $wasCompleted && $actionItem->status !== 'completed' ? 'reopened' : ($actionItem->status === 'completed' ? 'completed' : 'updated');
-                $actionItem->history()->create(['actor_id' => $request->user()->id, 'event' => $event, 'changes' => $changes, 'created_at' => now()]);
+                $actionItem->history()->create(['actor_id' => $request->user()->id, 'event' => $event, 'changes' => $changes, 'created_at' => now('UTC')]);
             }
         });
         $predictions->evaluatePending($meeting->id);
@@ -755,10 +755,9 @@ class MeetingController extends Controller
                 'nullable', 'integer',
                 Rule::exists('meeting_participants', 'user_id')->where('meeting_id', $meeting->id),
             ],
-            'decided_at' => ['nullable', 'date'],
         ]);
 
-        $meeting->decisions()->create($validated + ['decided_at' => now()]);
+        $meeting->decisions()->create([...$validated, 'decided_at' => now('UTC')]);
 
         return back()->with('success', 'Decisão registrada.');
     }
@@ -826,7 +825,7 @@ class MeetingController extends Controller
             $meeting->conclusion()->updateOrCreate([], [
                 ...$validated,
                 'recorded_by' => $request->user()->id,
-                'concluded_at' => now(),
+                'concluded_at' => now('UTC'),
             ]);
             foreach ($participation as $participantId => $values) {
                 $participant = $meeting->meetingParticipants()->findOrFail($participantId);
@@ -874,7 +873,7 @@ class MeetingController extends Controller
             'participation_score' => ['nullable', 'integer', 'between:1,5'], 'effectiveness_score' => ['nullable', 'integer', 'between:1,5'],
             'suggestion' => ['nullable', 'string'], 'comments' => ['nullable', 'string'],
         ]);
-        $meeting->participantFeedback()->updateOrCreate(['user_id' => $request->user()->id], [...$validated, 'submitted_at' => now()]);
+        $meeting->participantFeedback()->updateOrCreate(['user_id' => $request->user()->id], [...$validated, 'submitted_at' => now('UTC')]);
 
         return back()->with('success', 'Feedback registrado. As avaliações são usadas de forma agregada, sem classificar desempenho individual.');
     }
@@ -909,7 +908,7 @@ class MeetingController extends Controller
             'provider_cost' => is_numeric(data_get($metadata, 'usage.cost')) ? data_get($metadata, 'usage.cost') : null,
             'status' => $result === null ? 'failed' : 'completed',
             'error_message' => $preflight['ai_error'] ?? null,
-            'completed_at' => $result === null ? null : now(),
+            'completed_at' => $result === null ? null : now('UTC'),
         ]);
     }
 
@@ -983,7 +982,7 @@ class MeetingController extends Controller
             'usage' => $aiResponse['usage'],
             'provider_cost' => is_numeric(data_get($aiResponse, 'usage.cost')) ? data_get($aiResponse, 'usage.cost') : null,
             'status' => 'completed',
-            'completed_at' => now(),
+            'completed_at' => now('UTC'),
         ]);
     }
 
@@ -1030,7 +1029,7 @@ class MeetingController extends Controller
             })->with('actionItems')->get();
         $elapsedSeconds = (int) ($meeting->actual_duration_seconds ?? 0);
         if ($meeting->timer_started_at !== null) {
-            $elapsedSeconds += max(0, now()->diffInSeconds($meeting->timer_started_at, absolute: true));
+            $elapsedSeconds += max(0, now('UTC')->diffInSeconds($meeting->timer_started_at, absolute: true));
         }
 
         $terms = collect(preg_split('/\s+/u', Str::lower($meeting->title)) ?: [])
@@ -1216,7 +1215,7 @@ class MeetingController extends Controller
                     'team_id' => $participant->user?->team_id,
                     'directorate_id' => $participant->user?->directorate_id,
                     'hourly_rate' => $participant->user ? $costCalculator->userRate($participant->user) : 0,
-                    'captured_at' => now(),
+                    'captured_at' => now('UTC'),
                 ]);
             });
     }

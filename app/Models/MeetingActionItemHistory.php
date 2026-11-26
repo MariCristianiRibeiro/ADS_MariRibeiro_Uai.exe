@@ -16,6 +16,13 @@ class MeetingActionItemHistory extends Model
         return ['changes' => 'array', 'created_at' => 'datetime'];
     }
 
+    protected static function booted(): void
+    {
+        static::creating(function (MeetingActionItemHistory $history): void {
+            $history->created_at ??= now('UTC');
+        });
+    }
+
     public function actionItem(): BelongsTo
     {
         return $this->belongsTo(MeetingActionItem::class, 'meeting_action_item_id');

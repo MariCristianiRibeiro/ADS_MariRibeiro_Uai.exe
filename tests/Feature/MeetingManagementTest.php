@@ -878,3 +878,73 @@ it('does not add the general administrator as a meeting participant', function (
 
     expect($meeting->users)->toBeEmpty();
 });
+
+it('shows real investment and collaborator hours independently for the current calendar periods', function () {
+    $this->travelTo('2026-11-25 12:00:00');
+    $owner = createUserWithPermissions(['meetings.view', 'reports.costs']);
+    $first = User::factory()->create(['hourly_rate' => 100]);
+    $second = User::factory()->create(['hourly_rate' => 200]);
+    $third = User::factory()->create(['hourly_rate' => 50]);
+    $fourth = User::factory()->create(['hourly_rate' => 40]);
+
+    $makeMeeting = function (string $date, int $seconds, array $attendees) use ($owner): Meeting {
+        $meeting = Meeting::create([
+            'user_id' => $owner->id,
+            'title' => 'Meeting investment period',
+            'date' => $date,
+            'duration_minutes' => 60,
+            'actual_duration_seconds' => $seconds,
+            'status' => 'completed',
+            'recurrence_type' => 'single',
+        ]);
+
+        foreach ($attendees as $userId => $attendanceStatus) {
+            $meeting->users()->attach($userId, ['attendance_status' => $attendanceStatus]);
+        }
+
+        return $meeting;
+    };
+
+    $makeMeeting('2026-11-10', 3600, [$first->id => 'present', $second->id => 'confirmed', $third->id => 'absent']);
+    $makeMeeting('2026-10-01', 7200, [$third->id => 'present']);
+    $makeMeeting('2026-07-01', 3600, [$fourth->id => 'confirmed']);
+    $makeMeeting('2025-11-10', 3600, [$first->id => 'present']);
+    $makeMeeting('2026-12-31', 3600, [$first->id => 'present']);
+
+    $this->actingAs($owner)->get(route('dashboard'))
+        ->assertOk()
+        ->assertViewHas('meetingInvestmentPeriods', function (array $periods): bool {
+            return $periods['year']['cost'] === 440.0
+                && $periods['year']['collaborator_hours'] === 5.0
+                && $periods['quarter']['cost'] === 400.0
+                && $periods['quarter']['collaborator_hours'] === 4.0
+                && $periods['month']['cost'] === 300.0
+                && $periods['month']['collaborator_hours'] === 2.0;
+        })
+        ->assertSee('Investimento real em')
+        ->assertSee('R$ 440,00')
+        ->assertSee('R$ 400,00')
+        ->assertSee('R$ 300,00');
+});
+
+it('hides financial dashboard totals from users without cost permission', function () {
+    $viewer = createUserWithPermissions(['meetings.view']);
+    $owner = User::factory()->create();
+    $attendee = User::factory()->create(['hourly_rate' => 100]);
+    $meeting = Meeting::create([
+        'user_id' => $owner->id,
+        'title' => 'Restricted financial meeting',
+        'date' => now('America/Sao_Paulo')->toDateString(),
+        'duration_minutes' => 60,
+        'actual_duration_seconds' => 3600,
+        'status' => 'completed',
+        'recurrence_type' => 'single',
+    ]);
+    $meeting->users()->attach($attendee->id, ['attendance_status' => 'present']);
+
+    $this->actingAs($viewer)->get(route('dashboard'))
+        ->assertOk()
+        ->assertSee('Acesso restrito')
+        ->assertViewHas('meetingInvestmentPeriods', fn (array $periods): bool => $periods['month']['cost'] === null
+            && $periods['month']['collaborator_hours'] === 1.0);
+});

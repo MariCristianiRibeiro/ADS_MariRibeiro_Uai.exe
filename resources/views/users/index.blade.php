@@ -16,15 +16,15 @@
 
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4 mb-6">
                 <form method="GET" action="{{ route('users.index') }}" class="flex flex-col md:flex-row gap-3">
-                    <input type="text" name="search" value="{{ $search }}" placeholder="Buscar por nome ou e-mail" class="w-full md:flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                    <select name="status" class="w-full md:w-56 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <input type="text" name="search" value="{{ $search }}" placeholder="Buscar por nome ou e-mail" class="w-full md:flex-1 rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
+                    <select name="status" class="w-full md:w-56 rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
                         <option value="all" {{ $statusFilter === 'all' ? 'selected' : '' }}>Todos os status</option>
                         <option value="active" {{ $statusFilter === 'active' ? 'selected' : '' }}>Ativos</option>
                         <option value="pending_finance" {{ $statusFilter === 'pending_finance' ? 'selected' : '' }}>Pendentes financeiros</option>
                         <option value="pending" {{ $statusFilter === 'pending' ? 'selected' : '' }}>Pendentes</option>
                         <option value="inactive" {{ $statusFilter === 'inactive' ? 'selected' : '' }}>Inativos</option>
                     </select>
-                    <select name="role" class="w-full md:w-56 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <select name="role" class="w-full md:w-56 rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
                         <option value="all" {{ $roleFilter === 'all' ? 'selected' : '' }}>Todos os perfis organizacionais</option>
                         <option value="admin" {{ $roleFilter === 'admin' ? 'selected' : '' }}>Administrador geral</option>
                         <option value="hr" {{ $roleFilter === 'hr' ? 'selected' : '' }}>RH</option>
@@ -69,9 +69,9 @@
                                             {{ $user->status ?? 'active' }}
                                         </span>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $user->created_at->format('d/m/Y H:i') }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $user->created_at->timezone('America/Sao_Paulo')->format('d/m/Y H:i') }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <a href="{{ route('users.edit', $user) }}" class="text-indigo-600 hover:text-indigo-900">Editar</a>
+                                        <a href="{{ route('users.edit', $user) }}" class="text-teal-600 hover:text-teal-900">Editar</a>
                                     </td>
                                 </tr>
                             @empty

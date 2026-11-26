@@ -15,19 +15,19 @@
                     <div class="grid grid-cols-1 gap-6">
                         <div>
                             <label for="name" class="block text-sm font-medium text-gray-700">Nome</label>
-                            <input id="name" name="name" type="text" value="{{ old('name', $user->name) }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <input id="name" name="name" type="text" value="{{ old('name', $user->name) }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
                             @error('name') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
                         </div>
 
                         <div>
                             <label for="email" class="block text-sm font-medium text-gray-700">E-mail</label>
-                            <input id="email" name="email" type="email" value="{{ old('email', $user->email) }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <input id="email" name="email" type="email" value="{{ old('email', $user->email) }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
                             @error('email') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
                         </div>
 
                         <div>
                             <label for="role" class="block text-sm font-medium text-gray-700">Papel organizacional <x-info-tip text="Indica o papel na hierarquia e pode influenciar escopos e relatórios. As permissões são definidas separadamente em Perfis de acesso." /></label>
-                            <select id="role" name="role" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <select id="role" name="role" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
                                 <option value="participant" {{ old('role', $user->role ?? 'participant') === 'participant' ? 'selected' : '' }}>Participante / Organizador</option>
                                 <option value="admin" {{ old('role', $user->role ?? 'participant') === 'admin' ? 'selected' : '' }}>Administrador</option>
                                 <option value="hr" {{ old('role', $user->role) === 'hr' ? 'selected' : '' }}>RH</option>
@@ -44,7 +44,7 @@
                             <label for="supervisor_ids" class="block text-sm font-medium text-gray-700">Superiores responsáveis</label>
                             <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
                                 @foreach ([0 => 'Superior 1', 1 => 'Superior 2 (opcional)'] as $index => $label)
-                                    <select name="supervisor_ids[]" class="block w-full rounded-md border-gray-300 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    <select name="supervisor_ids[]" class="block w-full rounded-md border-gray-300 bg-white shadow-sm focus:border-teal-500 focus:ring-teal-500">
                                         <option value="">{{ $label }}</option>
                                         @foreach ($availableSupervisors as $supervisor)
                                             <option value="{{ $supervisor->id }}" {{ $supervisors->get($index)?->id === $supervisor->id ? 'selected' : '' }}>{{ $supervisor->name }} - {{ ['admin' => 'Administrador geral', 'hr' => 'RH', 'executive' => 'Executiva', 'director' => 'Diretor', 'director_commercial' => 'Diretor Comercial', 'director_network' => 'Diretor de Rede', 'manager' => 'Gestor', 'participant' => 'Colaborador'][$supervisor->role] ?? $supervisor->role }}</option>
@@ -73,7 +73,7 @@
 
                         <div>
                             <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
-                            <select id="status" name="status" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <select id="status" name="status" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
                                 <option value="active" {{ old('status', $user->status ?? 'active') === 'active' ? 'selected' : '' }}>Ativo</option>
                                 <option value="pending_finance" {{ old('status', $user->status ?? 'pending_finance') === 'pending_finance' ? 'selected' : '' }}>Pendente de configuração financeira</option>
                                 <option value="pending" {{ old('status', $user->status ?? 'pending') === 'pending' ? 'selected' : '' }}>Pendente</option>
@@ -85,8 +85,8 @@
                     </div>
 
                     <div class="mt-6 flex justify-end gap-3">
-                        <a href="{{ route('users.index') }}" class="inline-flex items-center justify-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25 transition ease-in-out duration-150">Cancelar</a>
-                        <button type="submit" class="inline-flex items-center justify-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">Atualizar</button>
+                        <a href="{{ route('users.index') }}" class="inline-flex items-center justify-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-25 transition ease-in-out duration-150">Cancelar</a>
+                        <button type="submit" class="inline-flex items-center justify-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition ease-in-out duration-150">Atualizar</button>
                     </div>
                 </form>
             </div>

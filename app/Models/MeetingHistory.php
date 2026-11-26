@@ -18,6 +18,13 @@ class MeetingHistory extends Model
         return ['changes' => 'array', 'created_at' => 'datetime'];
     }
 
+    protected static function booted(): void
+    {
+        static::creating(function (MeetingHistory $history): void {
+            $history->created_at ??= now('UTC');
+        });
+    }
+
     public function meeting(): BelongsTo
     {
         return $this->belongsTo(Meeting::class);

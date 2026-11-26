@@ -44,7 +44,7 @@
                         </svg>
                     </button>
                     @isset($header)
-                        <div class="min-w-0 flex-1">
+                        <div class="app-page-heading min-w-0 flex-1">
                             {{ $header }}
                         </div>
                     @else

@@ -25,8 +25,8 @@
 
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4 mb-6">
                 <form method="GET" action="{{ route('meetings.index') }}" class="flex flex-col md:flex-row gap-3">
-                    <input type="text" name="search" value="{{ $search }}" placeholder="Buscar por título, local ou observações" class="w-full md:w-2/3 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                    <select name="status" class="w-full md:w-1/4 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <input type="text" name="search" value="{{ $search }}" placeholder="Buscar por título, local ou observações" class="w-full md:w-2/3 rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
+                    <select name="status" class="w-full md:w-1/4 rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
                         <option value="all" {{ $statusFilter === 'all' ? 'selected' : '' }}>Todos</option>
                         <option value="draft" {{ $statusFilter === 'draft' ? 'selected' : '' }}>Rascunhos</option>
                         <option value="scheduled" {{ $statusFilter === 'scheduled' ? 'selected' : '' }}>Agendadas</option>
@@ -34,7 +34,7 @@
                         <option value="completed" {{ $statusFilter === 'completed' ? 'selected' : '' }}>Concluídas</option>
                         <option value="canceled" {{ $statusFilter === 'canceled' ? 'selected' : '' }}>Canceladas</option>
                     </select>
-                    <button type="submit" class="inline-flex items-center justify-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">Filtrar</button>
+                    <button type="submit" class="inline-flex items-center justify-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition ease-in-out duration-150">Filtrar</button>
                 </form>
             </div>
 
@@ -95,7 +95,7 @@
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                         <a href="{{ route('meetings.show', $meeting) }}" class="text-teal-700 hover:text-teal-900 mr-3">Detalhes</a>
-                                        <a href="{{ route('meetings.edit', $meeting) }}" class="text-indigo-600 hover:text-indigo-900 mr-3">Editar</a>
+                                        <a href="{{ route('meetings.edit', $meeting) }}" class="text-teal-600 hover:text-teal-900 mr-3">Editar</a>
                                         @can('meetings.edit')
                                         @if (! in_array($meeting->status, ['completed', 'canceled'], true))
                                         <form action="{{ route('meetings.cancel', $meeting) }}" method="POST" class="inline">

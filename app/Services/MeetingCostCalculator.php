@@ -69,6 +69,22 @@ class MeetingCostCalculator
             : 0);
     }
 
+    public function collaboratorHours(Meeting $meeting): float
+    {
+        $meeting->loadMissing(['meetingParticipants', 'users', 'participants']);
+
+        $attendeeCount = match (true) {
+            $meeting->meetingParticipants->isNotEmpty() => $meeting->meetingParticipants
+                ->whereIn('attendance_status', ['confirmed', 'present'])->count(),
+            $meeting->users->isNotEmpty() => $meeting->users
+                ->filter(fn (User $user): bool => in_array($user->pivot->attendance_status, ['confirmed', 'present'], true))->count(),
+            default => $meeting->participants
+                ->filter(fn (Participant $participant): bool => in_array($participant->pivot->attendance_status, ['confirmed', 'present'], true))->count(),
+        };
+
+        return ((float) ($meeting->actual_duration_seconds ?? 0) / 3600) * $attendeeCount;
+    }
+
     public function estimatedTotal(Meeting $meeting): float
     {
         $meeting->loadMissing('users.jobPosition', 'participants.memberUser.jobPosition', 'meetingParticipants.user.jobPosition', 'meetingParticipants.user.participantProfile', 'meetingParticipants.costSnapshot');

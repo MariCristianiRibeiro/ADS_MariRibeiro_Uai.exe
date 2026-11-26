@@ -144,7 +144,7 @@ class AccessControlService
                 'actor' => ['id' => $actor->id, 'name' => $actor->name],
                 'subject' => $subject ? ['id' => $subject->id, 'name' => $subject->name] : null,
             ],
-            'created_at' => now(),
+            'created_at' => now('UTC'),
         ]);
     }
 }

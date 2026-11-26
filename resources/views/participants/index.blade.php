@@ -27,14 +27,14 @@
 
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4 mb-6">
                 <form method="GET" action="{{ route('participants.index') }}" class="flex flex-col md:flex-row gap-3">
-                    <input type="text" name="search" value="{{ $search }}" placeholder="Buscar por nome, e-mail ou telefone" class="w-full md:w-2/3 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                    <select name="status" class="w-full md:w-1/4 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <input type="text" name="search" value="{{ $search }}" placeholder="Buscar por nome, e-mail ou telefone" class="w-full md:w-2/3 rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
+                    <select name="status" class="w-full md:w-1/4 rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
                         <option value="all" {{ $statusFilter === 'all' ? 'selected' : '' }}>Todos</option>
                         <option value="active" {{ $statusFilter === 'active' ? 'selected' : '' }}>Ativos</option>
                         <option value="pending" {{ $statusFilter === 'pending' ? 'selected' : '' }}>Pendentes</option>
                         <option value="inactive" {{ $statusFilter === 'inactive' ? 'selected' : '' }}>Inativos</option>
                     </select>
-                    <button type="submit" class="inline-flex items-center justify-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                    <button type="submit" class="inline-flex items-center justify-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition ease-in-out duration-150">
                         Buscar
                     </button>
                 </form>
@@ -79,7 +79,7 @@
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <a href="{{ route('participants.edit', $participant) }}" class="text-indigo-600 hover:text-indigo-900 mr-3">Editar</a>
+                                        <a href="{{ route('participants.edit', $participant) }}" class="text-teal-600 hover:text-teal-900 mr-3">Editar</a>
                                         <form action="{{ route('participants.destroy', $participant) }}" method="POST" class="inline">
                                             @csrf
                                             @method('DELETE')

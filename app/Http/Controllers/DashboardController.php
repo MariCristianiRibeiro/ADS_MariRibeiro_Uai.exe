@@ -6,6 +6,8 @@ use App\Models\Meeting;
 use App\Models\Participant;
 use App\Models\User;
 use App\Services\MeetingCostCalculator;
+use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
@@ -14,7 +16,35 @@ class DashboardController extends Controller
     public function index(MeetingCostCalculator $costCalculator): View
     {
         $canViewCosts = Auth::user()->canViewCosts();
-        $today = now('America/Sao_Paulo')->toDateString();
+        $today = now('America/Sao_Paulo');
+        $yearStart = $today->copy()->startOfYear();
+        $quarterStart = $today->copy()->startOfQuarter();
+        $monthStart = $today->copy()->startOfMonth();
+        $actualMeetings = Meeting::query()
+            ->whereNotNull('actual_duration_seconds')
+            ->whereDate('date', '>=', $yearStart->toDateString())
+            ->whereDate('date', '<=', $today->toDateString())
+            ->with([
+                'meetingParticipants.costSnapshot',
+                'meetingParticipants.user.jobPosition',
+                'meetingParticipants.user.participantProfile',
+                'users.jobPosition',
+                'users.participantProfile',
+                'participants.memberUser.jobPosition',
+            ])
+            ->get();
+        $periodMetrics = fn (Carbon $start, Carbon $end): array => $this->periodMetrics(
+            $actualMeetings->filter(fn (Meeting $meeting): bool => $meeting->date->toDateString() >= $start->toDateString()
+                && $meeting->date->toDateString() <= $end->toDateString()),
+            $costCalculator,
+            $canViewCosts,
+        );
+        $meetingInvestmentPeriods = [
+            'year' => ['label' => 'Ano vigente', 'period' => $today->format('Y')] + $periodMetrics($yearStart, $today),
+            'quarter' => ['label' => 'Trimestre vigente', 'period' => 'T'.$today->quarter.' - '.$today->format('Y')] + $periodMetrics($quarterStart, $today),
+            'month' => ['label' => 'Mes vigente', 'period' => $today->format('m/Y')] + $periodMetrics($monthStart, $today),
+        ];
+        $todayDate = $today->toDateString();
         $meetings = Meeting::query()
             ->where('user_id', Auth::id())
             ->where(function ($query): void {
@@ -70,7 +100,7 @@ class DashboardController extends Controller
             ->where('user_id', Auth::id())
             ->whereIn('status', ['draft', 'scheduled'])
             ->whereNull('timer_started_at')
-            ->whereDate('date', '<', $today)
+            ->whereDate('date', '<', $todayDate)
             ->orderBy('date')
             ->get(['id', 'title', 'date']);
 
@@ -85,6 +115,16 @@ class DashboardController extends Controller
             'pastMeetings' => $pastMeetings,
             'selectedMeetingId' => $selectedMeetingId,
             'canViewCosts' => $canViewCosts,
+            'meetingInvestmentPeriods' => $meetingInvestmentPeriods,
         ]);
+    }
+
+    /** @return array{cost: ?float, collaborator_hours: float} */
+    private function periodMetrics(Collection $meetings, MeetingCostCalculator $costCalculator, bool $canViewCosts): array
+    {
+        return [
+            'cost' => $canViewCosts ? round($meetings->sum(fn (Meeting $meeting): float => $costCalculator->total($meeting)), 2) : null,
+            'collaborator_hours' => round($meetings->sum(fn (Meeting $meeting): float => $costCalculator->collaboratorHours($meeting)), 2),
+        ];
     }
 }

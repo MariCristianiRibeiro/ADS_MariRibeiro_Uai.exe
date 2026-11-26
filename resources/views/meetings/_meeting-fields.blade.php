@@ -1,7 +1,7 @@
 <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
     <div class="md:col-span-2">
         <label for="title" class="block text-sm font-medium text-gray-700">Título <x-info-tip text="Use um título curto e específico para identificar a reunião na agenda e no histórico." /></label>
-        <input id="title" name="title" type="text" value="{{ old('title', $meeting->title ?? '') }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+        <input id="title" name="title" type="text" value="{{ old('title', $meeting->title ?? '') }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
         @error('title') <span class="text-sm text-red-600">{{ $message }}</span> @enderror
     </div>
     <div>
@@ -40,7 +40,7 @@
     <div>
         <div class="flex items-center justify-between gap-3">
             <label for="project_id" class="block text-sm font-medium text-gray-700">Projeto <x-info-tip text="Vincule a reunião a um projeto para facilitar o acompanhamento e os relatórios." /></label>
-            <a href="{{ route('projects.create', ['return_to' => 'meeting']) }}" class="text-sm font-medium text-indigo-600 hover:text-indigo-800">+ Cadastrar projeto</a>
+            <a href="{{ route('projects.create', ['return_to' => 'meeting']) }}" class="text-sm font-medium text-teal-600 hover:text-teal-800">+ Cadastrar projeto</a>
         </div>
         <select id="project_id" name="project_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
             <option value="">Sem projeto</option>

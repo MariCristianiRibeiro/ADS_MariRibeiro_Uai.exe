@@ -15,13 +15,13 @@
                     <div class="grid grid-cols-1 gap-6">
                         <div>
                             <label for="name" class="block text-sm font-medium text-gray-700">Nome</label>
-                            <input id="name" name="name" type="text" value="{{ old('name', $participant->name) }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <input id="name" name="name" type="text" value="{{ old('name', $participant->name) }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
                             @error('name') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
                         </div>
 
                         <div>
                             <label for="email" class="block text-sm font-medium text-gray-700">E-mail</label>
-                            <input id="email" name="email" type="email" value="{{ old('email', $participant->email) }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <input id="email" name="email" type="email" value="{{ old('email', $participant->email) }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
                             @error('email') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
                         </div>
 
@@ -37,10 +37,10 @@
                             <div class="flex items-center justify-between gap-3">
                                 <label for="team_id" class="block text-sm font-medium text-gray-700">Equipe / rede</label>
                                 @can('manage-structure')
-                                    <a href="{{ route('teams.create') }}" class="text-sm font-medium text-indigo-600 hover:text-indigo-800">+ Cadastrar equipe</a>
+                                    <a href="{{ route('teams.create') }}" class="text-sm font-medium text-teal-600 hover:text-teal-800">+ Cadastrar equipe</a>
                                 @endcan
                             </div>
-                            <select id="team_id" name="team_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <select id="team_id" name="team_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
                                 <option value="">Sem equipe</option>
                                 @foreach ($teams as $team)
                                     <option value="{{ $team->id }}" {{ old('team_id', $participant->memberUser?->team_id) == $team->id ? 'selected' : '' }}>{{ $team->name }} — {{ $team->directorate->name }}</option>
@@ -52,13 +52,13 @@
 
                         <div>
                             <label for="phone" class="block text-sm font-medium text-gray-700">Telefone</label>
-                            <input id="phone" name="phone" type="text" value="{{ old('phone', $participant->phone) }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <input id="phone" name="phone" type="text" value="{{ old('phone', $participant->phone) }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
                             @error('phone') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
                         </div>
 
                         <div>
                             <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
-                            <select id="status" name="status" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <select id="status" name="status" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
                                 <option value="active" {{ old('status', $participant->status) === 'active' ? 'selected' : '' }}>Ativo</option>
                                 <option value="pending" {{ old('status', $participant->status) === 'pending' ? 'selected' : '' }}>Pendente</option>
                                 <option value="inactive" {{ old('status', $participant->status) === 'inactive' ? 'selected' : '' }}>Inativo</option>
@@ -76,14 +76,14 @@
                         </div>
                         <div>
                             <label for="notes" class="block text-sm font-medium text-gray-700">Observações</label>
-                            <textarea id="notes" name="notes" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">{{ old('notes', $participant->notes) }}</textarea>
+                            <textarea id="notes" name="notes" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">{{ old('notes', $participant->notes) }}</textarea>
                             @error('notes') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
                         </div>
                     </div>
 
                     <div class="mt-6 flex justify-end gap-3">
-                        <a href="{{ route('participants.index') }}" class="inline-flex items-center justify-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25 transition ease-in-out duration-150">Cancelar</a>
-                        <button type="submit" class="inline-flex items-center justify-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">Atualizar</button>
+                        <a href="{{ route('participants.index') }}" class="inline-flex items-center justify-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-25 transition ease-in-out duration-150">Cancelar</a>
+                        <button type="submit" class="inline-flex items-center justify-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition ease-in-out duration-150">Atualizar</button>
                     </div>
                 </form>
             </div>

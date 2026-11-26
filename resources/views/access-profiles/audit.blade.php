@@ -2,14 +2,14 @@
     <x-slot name="header"><h2 class="font-semibold text-xl text-gray-800 leading-tight">Histórico de acessos</h2></x-slot>
     <div class="py-6">
         <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-            <div class="mb-4"><a href="{{ route('access-profiles.index') }}" class="text-indigo-700">Voltar aos perfis</a></div>
+            <div class="mb-4"><a href="{{ route('access-profiles.index') }}" class="text-teal-700">Voltar aos perfis</a></div>
             <div class="overflow-x-auto rounded bg-white shadow">
                 <table class="w-full">
                     <thead><tr class="border-b text-left"><th class="p-4">Data</th><th class="p-4">Responsável</th><th class="p-4">Ação</th><th class="p-4">Alvo</th></tr></thead>
                     <tbody>
                         @forelse ($audits as $audit)
                             <tr class="border-b">
-                                <td class="p-4 whitespace-nowrap">{{ $audit->created_at->format('d/m/Y H:i:s') }}</td>
+                                <td class="p-4 whitespace-nowrap">{{ $audit->created_at->timezone('America/Sao_Paulo')->format('d/m/Y H:i:s') }}</td>
                                 <td class="p-4">{{ $audit->actor?->name ?? data_get($audit->details, 'actor.name', 'Conta removida') }}</td>
                                 <td class="p-4">
                                     @switch($audit->event)

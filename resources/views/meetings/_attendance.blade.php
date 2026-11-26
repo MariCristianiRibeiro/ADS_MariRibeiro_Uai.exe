@@ -8,7 +8,7 @@
         @endphp
         <div class="mb-3 grid grid-cols-1 items-center gap-2 sm:grid-cols-2">
             <label for="attendance_{{ $member->id }}" class="text-sm text-gray-700">{{ $member->name }}</label>
-            <select id="attendance_{{ $member->id }}" name="attendance[{{ $member->id }}]" x-on:change="$dispatch('meeting-attendance-changed', { id: {{ $member->id }}, status: $event.target.value })" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+            <select id="attendance_{{ $member->id }}" name="attendance[{{ $member->id }}]" x-on:change="$dispatch('meeting-attendance-changed', { id: {{ $member->id }}, status: $event.target.value })" class="rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
                 <option value="pending" {{ $attendanceStatus === 'pending' ? 'selected' : '' }}>Aguardando confirmação</option>
                 <option value="confirmed" {{ $attendanceStatus === 'confirmed' ? 'selected' : '' }}>Presença confirmada</option>
                 <option value="absent" {{ $attendanceStatus === 'absent' ? 'selected' : '' }}>Não comparecerá</option>

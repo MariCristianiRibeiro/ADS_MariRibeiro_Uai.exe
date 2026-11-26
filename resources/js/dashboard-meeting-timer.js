@@ -6,6 +6,7 @@ export default (meetings = [], initialMeetingId = null) => ({
     tickCount: 0,
     interval: null,
     processing: false,
+    processingAction: '',
     error: '',
 
     init() {
@@ -86,6 +87,7 @@ export default (meetings = [], initialMeetingId = null) => ({
         if (!this.selectedMeeting || this.isRunning || this.processing) return;
 
         this.processing = true;
+        this.processingAction = 'start';
         this.error = '';
 
         try {
@@ -120,6 +122,7 @@ export default (meetings = [], initialMeetingId = null) => ({
             this.error = error instanceof Error ? error.message : 'Não foi possível iniciar o cronômetro.';
         } finally {
             this.processing = false;
+            this.processingAction = '';
         }
     },
 
@@ -127,6 +130,7 @@ export default (meetings = [], initialMeetingId = null) => ({
         if (!this.selectedMeeting || !this.isRunning || this.processing) return;
 
         this.processing = true;
+        this.processingAction = 'pause';
         this.error = '';
 
         try {
@@ -139,6 +143,7 @@ export default (meetings = [], initialMeetingId = null) => ({
             this.error = error instanceof Error ? error.message : 'Não foi possível salvar o tempo da reunião.';
         } finally {
             this.processing = false;
+            this.processingAction = '';
         }
     },
 
@@ -146,6 +151,7 @@ export default (meetings = [], initialMeetingId = null) => ({
         if (!this.selectedMeeting || !this.canFinish || this.processing) return;
 
         this.processing = true;
+        this.processingAction = 'finish';
         this.error = '';
 
         try {
@@ -160,6 +166,7 @@ export default (meetings = [], initialMeetingId = null) => ({
             this.error = error instanceof Error ? error.message : 'Não foi possível finalizar a reunião.';
         } finally {
             this.processing = false;
+            this.processingAction = '';
         }
     },
 

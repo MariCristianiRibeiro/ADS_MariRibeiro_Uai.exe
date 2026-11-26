@@ -10,13 +10,10 @@
             </div>
 
             <section class="calculator-panel mb-6" aria-labelledby="meeting-timer-title">
-                <div class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                        <p class="panel-overline">Acompanhe em tempo real</p>
-                        <h2 id="meeting-timer-title" class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Cronômetro da reunião</h2>
-                        <p class="mt-2 text-sm leading-6 text-slate-600">Selecione uma reunião criada por você para contabilizar o tempo e o investimento realizado.</p>
-                    </div>
-                    <a href="{{ route('meetings.index') }}" class="dashboard-link">Ver reuniões</a>
+                <div>
+                    <p class="panel-overline">Acompanhe em tempo real</p>
+                    <h2 id="meeting-timer-title" class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Cronômetro da reunião</h2>
+                    <p class="mt-2 text-sm leading-6 text-slate-600">Selecione uma reunião criada por você para contabilizar o tempo e o investimento realizado.</p>
                 </div>
 
                 @if ($dashboardMeetings->isNotEmpty())
@@ -44,7 +41,12 @@
                                     </span>
                                     <span>Tempo decorrido</span>
                                 </div>
-                                <p class="mt-3 font-mono text-5xl font-bold tabular-nums tracking-tight text-white sm:text-6xl" aria-live="off" x-text="formatTime()">00:00:00</p>
+                                <div class="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                    <p class="font-mono text-5xl font-bold tabular-nums tracking-tight text-white sm:text-6xl" aria-live="off" x-text="formatTime()">00:00:00</p>
+                                    <button type="button" x-show="isRunning || canStart" x-on:click="isRunning ? stop() : start()" x-bind:disabled="processing" class="inline-flex h-12 w-full shrink-0 items-center justify-center rounded-md border border-teal-300/40 bg-teal-700 px-[1.1rem] text-sm font-bold text-white shadow-sm transition hover:bg-teal-600 disabled:cursor-wait disabled:opacity-60 sm:w-48">
+                                        <span x-text="isRunning ? 'Pausar' : (selectedMeeting?.actualDurationSeconds > 0 ? 'Retomar cronômetro' : 'Iniciar cronômetro')">Iniciar cronômetro</span>
+                                    </button>
+                                </div>
                                 <p class="mt-2 text-sm text-slate-400"><span x-text="attendedCount"></span> participante(s) com presença contabilizada</p>
                             </div>
                         </div>
@@ -55,14 +57,12 @@
                             <p x-show="selectedMeeting?.status === 'completed'" class="text-sm font-medium text-slate-600">Reunião encerrada. O tempo e o investimento foram salvos para os relatórios.</p>
                             <p x-show="error" class="text-sm font-medium text-red-700" x-text="error"></p>
                             <div class="flex flex-col items-stretch gap-3 sm:items-end">
-                                <button type="button" x-show="canStart" x-on:click="start()" x-bind:disabled="processing" class="dashboard-action justify-center disabled:cursor-wait disabled:opacity-60">Iniciar cronômetro</button>
                                 <div x-show="canClosePast" class="flex flex-col gap-3 sm:flex-row">
                                     <a x-bind:href="selectedMeeting?.closeoutUrl" class="dashboard-action justify-center">Encerrar agenda</a>
                                     <a x-bind:href="selectedMeeting?.editUrl" class="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-800 shadow-sm transition hover:bg-slate-50">Reagendar agenda</a>
                                 </div>
-                                <button type="button" x-show="isRunning" x-on:click="stop()" x-bind:disabled="processing" class="dashboard-action disabled:cursor-wait disabled:opacity-60">Pausar e salvar tempo</button>
-                                <button type="button" x-show="canFinish" x-on:click="finish()" x-bind:disabled="processing" class="inline-flex items-center justify-center rounded-md border border-red-200 bg-white px-5 py-3 text-sm font-bold text-red-700 shadow-sm transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-60">
-                                    <span x-text="processing ? 'Finalizando...' : 'Finalizar reunião e encerrar cálculo'"></span>
+                                <button type="button" x-show="canFinish" x-on:click="finish()" x-bind:disabled="processing" class="inline-flex h-12 w-full items-center justify-center rounded-md border border-red-200 bg-white px-[1.1rem] text-sm font-bold text-red-700 shadow-sm transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-60 sm:w-60">
+                                    <span x-text="processingAction === 'finish' ? 'Finalizando...' : 'Finalizar'">Finalizar</span>
                                 </button>
                             </div>
                         </div>
@@ -71,9 +71,43 @@
                     <div class="mt-6 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center">
                         <p class="font-medium text-slate-800">Você não tem reuniões agendadas para o futuro nem reuniões em andamento.</p>
                         <p class="mt-1 text-sm text-slate-500">Agende uma reunião ou consulte os registros já existentes.</p>
-                        <a href="{{ route('meetings.create') }}" class="dashboard-action mt-4">Criar reunião</a>
                     </div>
                 @endif
+            </section>
+
+            <section class="summary-panel mb-6" aria-labelledby="meeting-investment-title">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                        <p class="panel-overline text-teal-100">Seu painel hoje</p>
+                        <h2 id="meeting-investment-title" class="mt-2 text-xl font-semibold tracking-tight text-white sm:text-2xl">Investimento real em reuniões</h2>
+                    </div>
+                    <p class="text-xs text-teal-100">Apurado pelas durações registradas e presenças confirmadas</p>
+                </div>
+
+                <div class="mt-6 grid gap-3 md:grid-cols-3 md:gap-4">
+                    @foreach ($meetingInvestmentPeriods as $investment)
+                        <article class="rounded-lg border border-white/10 bg-white/5 p-4 sm:p-5">
+                            <div class="flex items-center justify-between gap-3">
+                                <h3 class="text-xs font-bold uppercase tracking-[0.16em] text-teal-100">{{ $investment['label'] }}</h3>
+                                <span class="text-xs font-medium text-teal-100/80">{{ $investment['period'] }}</span>
+                            </div>
+                            <p class="mt-3 text-4xl font-bold tabular-nums tracking-tight text-white sm:text-5xl">
+                                @if ($investment['cost'] !== null)
+                                    R$ {{ number_format($investment['cost'], 2, ',', '.') }}
+                                @else
+                                    <span class="text-2xl text-teal-100">Acesso restrito</span>
+                                @endif
+                            </p>
+                            <p class="mt-2 text-sm text-teal-100/85">Equivale a <span class="font-semibold text-white">{{ number_format($investment['collaborator_hours'], 1, ',', '.') }} h</span> de colaboradores</p>
+                        </article>
+                    @endforeach
+                </div>
+
+                <div class="mt-5 flex flex-wrap gap-x-6 gap-y-2 border-t border-white/15 pt-4 text-xs text-teal-100">
+                    <span>{{ number_format($activeParticipantsCount, 0, ',', '.') }} participantes ativos</span>
+                    <span>{{ number_format($usersCount, 0, ',', '.') }} usuários cadastrados</span>
+                    <span>{{ number_format($participantsCount, 0, ',', '.') }} participantes cadastrados</span>
+                </div>
             </section>
 
             @if ($pastMeetings->isNotEmpty())
@@ -98,7 +132,7 @@
                 </details>
             @endif
 
-            <div class="grid gap-6">
+            <div class="hidden">
                 <section class="calculator-panel" aria-labelledby="calculator-title">
                     <div class="flex items-start justify-between gap-4">
                         <div>
@@ -121,17 +155,7 @@
                     </div>
                 </section>
 
-                <aside class="summary-panel">
-                    <div class="flex items-center justify-between"><p class="panel-overline text-teal-100">Seu painel hoje</p></div>
-                    <div class="mt-8 grid gap-6 sm:grid-cols-3 sm:items-end">
-                        <div><p class="text-sm text-teal-100">Participantes ativos</p><p class="mt-2 text-6xl font-semibold tracking-tight text-white">{{ $activeParticipantsCount }}</p></div>
-                        <div class="border-t border-white/15 pt-4 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0"><p class="text-xs text-teal-100">Usuários</p><p class="mt-1 text-2xl font-semibold text-white">{{ $usersCount }}</p></div>
-                        <div class="border-t border-white/15 pt-4 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0"><p class="text-xs text-teal-100">Participantes</p><p class="mt-1 text-2xl font-semibold text-white">{{ $participantsCount }}</p></div>
-                    </div>
-                </aside>
             </div>
-
-            <div class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 pt-6"><p class="text-sm text-slate-500">Pronto para transformar o cálculo em ação?</p><div class="flex gap-3"><a href="{{ route('meetings.index') }}" class="dashboard-link">Ver reuniões</a>@can('manage-users')<a href="{{ route('users.index') }}" class="dashboard-link">Gerenciar participantes</a>@endcan</div></div>
         </div>
     </div>
 </x-app-layout>

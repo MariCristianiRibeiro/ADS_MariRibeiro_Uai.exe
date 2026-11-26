@@ -13,7 +13,7 @@
     x-init="setDurationFromSchedule($el.closest('form').querySelector('[name=time]').value, $el.closest('form').querySelector('[name=end_time]').value)"
     x-on:meeting-schedule-changed.window="setDurationFromSchedule($event.detail.startTime, $event.detail.endTime)"
     x-on:meeting-participants-changed.window="selectParticipants($event.detail.ids)"
-    class="mt-6 rounded-lg border border-indigo-100 bg-indigo-50/50 p-5"
+    class="mt-6 rounded-lg border border-teal-100 bg-teal-50/50 p-5"
 >
     <div class="flex items-center gap-2">
         <h3 class="font-semibold text-gray-900">Investimento previsto</h3>
@@ -23,7 +23,7 @@
     <div class="mt-4 grid grid-cols-1 gap-4 {{ auth()->user()->canViewCosts() ? 'sm:grid-cols-2' : '' }}">
         <div>
             <label for="duration_minutes" class="block text-sm font-medium text-gray-700">Duração prevista (minutos) <x-info-tip text="Calculada pelo horário inicial e final quando ambos forem preenchidos. As horas colaborador multiplicam esta duração pelo número de participantes." /></label>
-            <input id="duration_minutes" name="duration_minutes" type="number" min="1" max="1440" required x-model.number="durationMinutes" x-bind:readonly="durationDerivedFromSchedule" value="{{ old('duration_minutes', ($meeting ?? null)?->duration_minutes ?? 60) }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 read-only:bg-gray-100 read-only:text-gray-600">
+            <input id="duration_minutes" name="duration_minutes" type="number" min="1" max="1440" required x-model.number="durationMinutes" x-bind:readonly="durationDerivedFromSchedule" value="{{ old('duration_minutes', ($meeting ?? null)?->duration_minutes ?? 60) }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 read-only:bg-gray-100 read-only:text-gray-600">
             <p x-show="durationDerivedFromSchedule" class="mt-1 text-xs text-gray-500">Duração calculada pelos horários informados.</p>
             @error('duration_minutes') <span class="text-sm text-red-600">{{ $message }}</span> @enderror
         </div>

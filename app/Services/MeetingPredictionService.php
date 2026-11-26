@@ -65,7 +65,7 @@ class MeetingPredictionService
                 'model_name' => $modelName,
                 'model_version' => self::MODEL_VERSION,
                 'status' => $validated ? 'validated' : 'insufficient_history',
-                'predicted_at' => now(),
+                'predicted_at' => now('UTC'),
                 'features' => $features + ['cohort' => 'categoria e similaridade de objetivo'],
                 'predicted_value' => $predictedValue,
                 'unit' => $unit,
@@ -95,7 +95,7 @@ class MeetingPredictionService
                 'model_name' => $modelName,
                 'model_version' => 'deterministic-1.0.0',
                 'status' => 'deterministic',
-                'predicted_at' => now(),
+                'predicted_at' => now('UTC'),
                 'features' => $features + ['formula' => 'MeetingCostCalculator::estimatedTotal × duração/frequência cadastrada'],
                 'predicted_value' => round((float) $value, 4),
                 'unit' => $deterministicUnit,
@@ -205,14 +205,14 @@ class MeetingPredictionService
                 'absolute_error' => round(abs($error), 4),
                 'squared_error' => round($error ** 2, 4),
                 'actual_snapshot' => $snapshot,
-                'observed_at' => now(),
+                'observed_at' => now('UTC'),
             ]);
             $prediction->update([
                 'actual_value' => round($actual, 4),
                 'error' => round($error, 4),
                 'absolute_error' => round(abs($error), 4),
                 'squared_error' => round($error ** 2, 4),
-                'evaluated_at' => now(),
+                'evaluated_at' => now('UTC'),
             ]);
             $evaluated++;
         }
@@ -521,7 +521,7 @@ class MeetingPredictionService
                 $realizedSavings = $meeting->meetingParticipants->filter(fn ($participant): bool => in_array($participant->attendance_status, ['present', 'confirmed'], true))
                     ->sum(fn ($participant): float => $minutesReduced / 60 * (float) ($participant->costSnapshot?->hourly_rate ?? ($participant->user ? $this->costs->userRate($participant->user) : 0)));
             }
-            $feedback->update(['realized_saving' => round($realizedSavings, 2), 'evaluated_at' => now()]);
+            $feedback->update(['realized_saving' => round($realizedSavings, 2), 'evaluated_at' => now('UTC')]);
         }
     }
 

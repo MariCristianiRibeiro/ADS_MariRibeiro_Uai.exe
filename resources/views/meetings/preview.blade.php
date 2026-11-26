@@ -2,7 +2,7 @@
     <x-slot name="header">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
-                <p class="text-sm font-medium text-indigo-600">Prévia antes da confirmação</p>
+                <p class="text-sm font-medium text-teal-600">Prévia antes da confirmação</p>
                 <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ $meetingData['title'] }}</h2>
             </div>
             <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">Valores estimados com os custos hora cadastrados</span>
@@ -14,7 +14,7 @@
             <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                        <p class="text-xs font-semibold uppercase tracking-wide text-indigo-700">Antes de confirmar</p>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-teal-700">Antes de confirmar</p>
                         <h3 class="mt-1 text-2xl font-bold text-gray-900">Análise da reunião</h3>
                         <p class="mt-2 max-w-3xl text-sm text-gray-600">
                             @if ($analysis['ai_generated'])
@@ -33,19 +33,19 @@
                     <div class="mt-6">
                         <p class="text-lg font-medium leading-relaxed text-gray-900">{{ $aiResult['summary'] }}</p>
                         @if (! empty($aiResult['recommendations']))
-                            <div class="mt-5 border-l-2 border-indigo-600 pl-4">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-indigo-700">Recomendação</p>
+                            <div class="mt-5 border-l-2 border-teal-600 pl-4">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-teal-700">Recomendação</p>
                                 <p class="mt-1 font-semibold text-gray-900">{{ $aiResult['recommendations'][0]['title'] }}</p>
                                 <p class="mt-1 text-sm leading-6 text-gray-700">{{ $aiResult['recommendations'][0]['detail'] }}</p>
                             </div>
                         @endif
                         <details class="mt-5 border-t border-gray-100 pt-4">
-                            <summary class="cursor-pointer text-sm font-semibold text-indigo-700">Ver análise completa</summary>
+                            <summary class="cursor-pointer text-sm font-semibold text-teal-700">Ver análise completa</summary>
                             <div class="mt-4 grid gap-4 md:grid-cols-2">
                             @foreach (['findings' => 'Constatações', 'recommendations' => 'Recomendações', 'risks' => 'Riscos', 'opportunities' => 'Oportunidades', 'missing_information' => 'Informações ausentes', 'historical_basis' => 'Base histórica', 'suggested_next_steps' => 'Próximos passos sugeridos'] as $key => $label)
                                 @if (! empty($aiResult[$key]))
                                     <div>
-                                        <h4 class="text-xs font-semibold uppercase tracking-wide text-indigo-700">{{ $label }}</h4>
+                                        <h4 class="text-xs font-semibold uppercase tracking-wide text-teal-700">{{ $label }}</h4>
                                         <ul class="mt-1 list-inside list-disc space-y-1 text-sm text-gray-700">
                                             @foreach ($aiResult[$key] as $item)
                                                 <li>@if (is_array($item))<strong>{{ $item['title'] }}</strong>: {{ $item['detail'] }} <span class="text-gray-500">{{ $item['justification'] }}</span>@else{{ $item }}@endif</li>
@@ -55,7 +55,7 @@
                                 @endif
                             @endforeach
                             </div>
-                            <p class="mt-4 text-xs text-gray-500">Confiança informada pelo modelo: {{ number_format((float) $aiResult['confidence'] * 100, 0, ',', '.') }}% · Gerada em {{ now()->format('d/m/Y H:i') }}.</p>
+                            <p class="mt-4 text-xs text-gray-500">Confiança informada pelo modelo: {{ number_format((float) $aiResult['confidence'] * 100, 0, ',', '.') }}% · Gerada em {{ now('America/Sao_Paulo')->format('d/m/Y H:i') }}.</p>
                             <details class="mt-3 text-xs text-gray-500"><summary class="cursor-pointer">Dados enviados para a IA</summary><pre class="mt-2 max-h-96 overflow-auto whitespace-pre-wrap">{{ json_encode($analysis['ai_input_data'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre></details>
                         @if (filled($analysis['ai_metadata']['usage']['total_tokens'] ?? null))
                             <p class="text-xs text-gray-500">Consumo registrado pelo provedor: {{ $analysis['ai_metadata']['usage']['total_tokens'] }} tokens totais.</p>
@@ -140,7 +140,7 @@
                 <article class="rounded-lg bg-white p-6 shadow-sm">
                     <h3 class="text-lg font-semibold text-gray-900">Histórico relacionado</h3>
                     @forelse ($analysis['similar_meetings'] as $similar)
-                        <div class="mt-4 border-l-2 border-indigo-200 pl-3">
+                        <div class="mt-4 border-l-2 border-teal-200 pl-3">
                             <p class="font-medium text-gray-800">{{ $similar->title }} <span class="font-normal text-gray-500">· {{ $similar->date?->format('d/m/Y') }}</span></p>
                             <p class="mt-1 text-sm text-gray-600">Conclusão: {{ $similar->conclusion?->outcome ?: $similar->conclusion?->summary ?: 'Sem conclusão registrada.' }}</p>
                             <p class="text-xs text-gray-500">{{ $similar->actionItems->where('status', 'completed')->count() }} de {{ $similar->actionItems->count() }} encaminhamento(s) concluído(s).</p>
@@ -194,7 +194,7 @@
                             <input type="hidden" name="{{ $key }}" value="{{ $value }}">
                         @endif
                     @endforeach
-                    <button type="submit" class="rounded-md bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600">Confirmar reunião</button>
+                    <button type="submit" class="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-600">Confirmar reunião</button>
                 </form>
             </section>
         </div>

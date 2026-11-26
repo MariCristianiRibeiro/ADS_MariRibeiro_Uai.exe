@@ -11,7 +11,7 @@
 
                     <div>
                         <label for="name" class="block text-sm font-medium text-gray-700">Nome da equipe</label>
-                        <input id="name" name="name" type="text" value="{{ old('name') }}" maxlength="255" required autofocus class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <input id="name" name="name" type="text" value="{{ old('name') }}" maxlength="255" required autofocus class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
                         @error('name')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                         @enderror
@@ -19,7 +19,7 @@
 
                     <div>
                         <label for="network" class="block text-sm font-medium text-gray-700">Rede</label>
-                        <input id="network" name="network" type="text" value="{{ old('network') }}" maxlength="255" required list="existing-networks" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <input id="network" name="network" type="text" value="{{ old('network') }}" maxlength="255" required list="existing-networks" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
                         <datalist id="existing-networks">
                             @foreach ($networkNames as $networkName)
                                 <option value="{{ $networkName }}"></option>
