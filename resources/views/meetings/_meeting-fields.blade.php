@@ -1,9 +1,4 @@
 <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
-    <div class="md:col-span-2">
-        <label for="title" class="block text-sm font-medium text-gray-700">Título <x-info-tip text="Use um título curto e específico para identificar a reunião na agenda e no histórico." /></label>
-        <input id="title" name="title" type="text" value="{{ old('title', $meeting->title ?? '') }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
-        @error('title') <span class="text-sm text-red-600">{{ $message }}</span> @enderror
-    </div>
     <div>
         @php
             $categoryOptions = ['Planejamento', 'Tomada de decisão', 'Acompanhamento', 'Alinhamento', 'Informativa', 'Outro'];
@@ -19,6 +14,11 @@
                 <option value="{{ $selectedCategory }}" selected>{{ $selectedCategory }} (categoria atual)</option>
             @endif
         </select>
+    </div>
+    <div class="md:col-span-2">
+        <label for="title" class="block text-sm font-medium text-gray-700">Título <x-info-tip text="Use um título curto e específico para identificar a reunião na agenda e no histórico." /></label>
+        <input id="title" name="title" type="text" value="{{ old('title', $meeting->title ?? '') }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
+        @error('title') <span class="text-sm text-red-600">{{ $message }}</span> @enderror
     </div>
     <div>
         <label for="organizer_id" class="block text-sm font-medium text-gray-700">Organizador <x-info-tip text="Pessoa responsável por convocar, conduzir e registrar os próximos passos da reunião." /></label>

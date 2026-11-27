@@ -13,7 +13,7 @@
                         @include('meetings._meeting-investment', ['selectedParticipantIds' => $selectedMemberIds])
                     </div>
                     <div class="mt-6 flex justify-end gap-3">
-                        <a href="{{ route('meetings.index') }}" class="rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-widest text-gray-700 shadow-sm">Cancelar</a>
+                        <a href="{{ route('meetings.index') }}" class="rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-widest text-red-600 shadow-sm hover:text-red-800">Cancelar</a>
                         <button type="submit" formaction="{{ route('meetings.preview') }}" class="rounded-md bg-teal-700 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white hover:bg-teal-800">Analisar investimento</button>
                     </div>
                 </form>

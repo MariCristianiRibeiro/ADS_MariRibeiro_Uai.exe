@@ -20,7 +20,7 @@
 
                     <div class="grid grid-cols-1 gap-6 md:grid-cols-2"><div><label for="directorate_id" class="block text-sm font-medium text-gray-700">Diretoria</label><select id="directorate_id" name="directorate_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"><option value="">Não atribuída</option>@foreach ($directorates as $item)<option value="{{ $item->id }}">{{ $item->name }}</option>@endforeach</select></div><div><label for="team_id" class="block text-sm font-medium text-gray-700">Equipe</label><select id="team_id" name="team_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"><option value="">Não atribuída</option>@foreach ($teams as $item)<option value="{{ $item->id }}">{{ $item->name }}</option>@endforeach</select></div></div>
 
-                    <div class="flex justify-end gap-3"><a href="{{ route('users.index') }}" class="rounded-md border border-gray-300 px-4 py-2 text-sm">Cancelar</a><button class="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800">Cadastrar usuário</button></div>
+                    <div class="flex justify-end gap-3"><a href="{{ route('users.index') }}" class="rounded-md border border-gray-300 px-4 py-2 text-sm text-red-600 hover:text-red-800">Cancelar</a><button class="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800">Cadastrar usuário</button></div>
                 </form>
             </div>
         </div>

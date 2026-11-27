@@ -1,13 +1,4 @@
 <x-app-layout>
-    <x-slot name="header">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <div><p class="text-xs font-semibold uppercase tracking-wider text-teal-700">{{ $meeting->category ?: 'Reunião' }}</p><h2 class="mt-1 text-xl font-semibold text-gray-800">{{ $meeting->title }}</h2></div>
-            @if (auth()->id() === $meeting->user_id)
-                <a href="{{ route('meetings.edit', $meeting) }}" class="rounded-md bg-gray-800 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white">Editar reunião</a>
-            @endif
-        </div>
-    </x-slot>
-
     <div class="py-6">
         <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
             @php
@@ -40,9 +31,16 @@
                 </section>
             @endif
 
+            @if (auth()->id() === $meeting->user_id)
+                <div class="flex justify-end">
+                    <a href="{{ route('meetings.edit', $meeting) }}" class="inline-flex h-11 min-h-[2.65rem] shrink-0 items-center justify-center whitespace-nowrap rounded-md bg-teal-700 px-4 text-xs font-semibold uppercase tracking-widest text-white transition hover:bg-teal-800">Editar reunião</a>
+                </div>
+            @endif
+
             <section class="grid gap-6 lg:grid-cols-3">
                 <div class="rounded-lg bg-white p-5 shadow-sm lg:col-span-2">
                     <h3 class="font-semibold text-gray-900">Planejamento</h3>
+                    <p class="mt-1 text-base font-semibold text-gray-800">{{ $meeting->title }}</p>
                     <dl class="mt-4 grid gap-4 sm:grid-cols-2">
                         <div><dt class="text-xs uppercase text-gray-500">Data e horário</dt><dd class="mt-1 text-sm text-gray-800">{{ $meeting->date?->format('d/m/Y') }} · {{ $meeting->time ? substr($meeting->time, 0, 5) : 'horário não definido' }}{{ $meeting->end_time ? '–'.substr($meeting->end_time, 0, 5) : '' }}</dd></div>
                         <div><dt class="text-xs uppercase text-gray-500">Status e prioridade</dt><dd class="mt-1 text-sm text-gray-800">{{ $meetingStatusLabels[$meeting->status] ?? 'Não informado' }} · {{ $priorityLabels[$meeting->priority] ?? 'Não informada' }}</dd></div>

@@ -42,7 +42,7 @@
             </div>
 
             <div class="mt-6 flex justify-end">
-                <x-secondary-button x-on:click="$dispatch('close')">
+                <x-secondary-button class="!text-red-600 hover:!text-red-800" x-on:click="$dispatch('close')">
                     {{ __('Cancelar') }}
                 </x-secondary-button>
 

@@ -31,7 +31,7 @@
                     </div>
 
                     <div class="flex justify-end gap-3">
-                        <a href="{{ route('teams.index') }}" class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-widest text-gray-700 shadow-sm transition hover:bg-gray-50">
+                        <a href="{{ route('teams.index') }}" class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-widest text-red-600 shadow-sm transition hover:bg-gray-50 hover:text-red-800">
                             Cancelar
                         </a>
                         <button type="submit" class="inline-flex items-center justify-center rounded-md bg-teal-700 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white shadow-sm transition hover:bg-teal-800">

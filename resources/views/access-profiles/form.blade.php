@@ -5,7 +5,7 @@
         @if ($profile->exists)<label class="flex items-center gap-2"><input type="checkbox" name="active" value="1" @checked(old('active', $profile->active))> Perfil ativo</label>@endif
         @php($selected = old('permissions', $profile->permissions->modelKeys()))
         <div class="space-y-4"><h3 class="font-semibold">Permissões</h3>@foreach ($permissions->groupBy('resource') as $resource => $items)<fieldset class="rounded border p-4"><legend class="flex items-center gap-2 px-2 font-medium"><input type="checkbox" class="module-toggle" data-module="{{ $resource }}">{{ str($resource)->replace('_', ' ')->title() }}</legend><div class="grid gap-2 sm:grid-cols-2">@foreach ($items as $permission)<label class="flex items-center gap-2"><input type="checkbox" name="permissions[]" value="{{ $permission->id }}" data-permission-module="{{ $resource }}" @checked(in_array($permission->id, $selected))>{{ $permission->description }}</label>@endforeach</div></fieldset>@endforeach</div>
-        <div class="flex justify-end gap-3"><a href="{{ route('access-profiles.index') }}" class="rounded border px-4 py-2">Cancelar</a><button class="rounded bg-gray-800 px-4 py-2 text-white">Salvar</button></div>
+        <div class="flex justify-end gap-3"><a href="{{ route('access-profiles.index') }}" class="rounded border px-4 py-2 text-red-600 hover:text-red-800">Cancelar</a><button class="rounded bg-gray-800 px-4 py-2 text-white">Salvar</button></div>
     </form></div></div>
     <script>document.querySelectorAll('.module-toggle').forEach((toggle) => toggle.addEventListener('change', () => document.querySelectorAll(`[data-permission-module="${toggle.dataset.module}"]`).forEach((permission) => permission.checked = toggle.checked)));</script>
 </x-app-layout>

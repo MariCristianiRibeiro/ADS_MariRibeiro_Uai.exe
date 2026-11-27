@@ -72,7 +72,7 @@
                                         <form action="{{ route('meetings.cancel', $meeting) }}" method="POST" class="inline">
                                             @csrf
                                             @method('PATCH')
-                                            <button type="submit" class="text-red-600 hover:text-red-900" onclick="return confirm('Deseja cancelar esta reunião?')">Cancelar</button>
+                                            <button type="submit" class="bg-transparent px-0 py-0 text-red-600 hover:text-red-800" onclick="return confirm('Deseja cancelar esta reunião?')">Cancelar</button>
                                         </form>
                                         @endif
                                         @endcan
