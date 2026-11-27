@@ -35,6 +35,8 @@
                         <a href="{{ route('dashboard') }}" aria-label="Uai - início" class="shrink-0 text-2xl font-extrabold tracking-tight text-teal-800">Uai</a>
                         @if (request()->routeIs('dashboard'))
                             <span class="min-w-0 max-w-[14rem] text-[0.65rem] font-normal uppercase leading-tight tracking-wide text-slate-500 sm:max-w-none sm:text-xs">, precisava mesmo?</span>
+                        @elseif (request()->routeIs('meetings.*'))
+                            <span class="min-w-0 max-w-[14rem] text-[0.65rem] font-normal uppercase leading-tight tracking-wide text-slate-500 sm:max-w-none sm:text-xs">, não poderia ser por e-mail?</span>
                         @endif
                     </div>
                     @isset($header)

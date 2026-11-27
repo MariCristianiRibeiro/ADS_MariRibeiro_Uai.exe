@@ -1,11 +1,4 @@
 <x-app-layout>
-    <x-slot name="header">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            
-            @if ($canExport)<a href="{{ route('reports.meetings.export', request()->query()) }}" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Exportar CSV</a>@endif
-        </div>
-    </x-slot>
-
     <div class="py-8"><div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
         <form method="GET" action="{{ route('reports.meetings.dashboard') }}" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
             <div class="mb-4 flex items-center justify-between"><h3 class="font-semibold text-gray-900">Filtros</h3><a href="{{ route('reports.meetings.dashboard') }}" class="text-sm text-teal-700">Limpar</a></div>
@@ -21,7 +14,12 @@
                 <label class="text-sm font-medium text-gray-700">Recorrência<select name="recurrence" class="mt-1 block w-full rounded-lg border-gray-300 text-sm"><option value="">Todas</option>@foreach (['single' => 'Única', 'recurring' => 'Recorrente (todas)', 'daily' => 'Diária', 'weekly' => 'Semanal', 'monthly' => 'Mensal', 'yearly' => 'Anual'] as $value => $label)<option value="{{ $value }}" @selected($filters['recurrence'] === $value)>{{ $label }}</option>@endforeach</select></label>
                 <label class="text-sm font-medium text-gray-700">Status<select name="status" class="mt-1 block w-full rounded-lg border-gray-300 text-sm"><option value="">Todos</option>@foreach (['scheduled' => 'Agendada', 'ongoing' => 'Em andamento', 'completed' => 'Concluída', 'canceled' => 'Cancelada'] as $value => $label)<option value="{{ $value }}" @selected($filters['status'] === $value)>{{ $label }}</option>@endforeach</select></label>
             </div>
-            <div class="mt-4 flex justify-end"><button class="rounded-lg bg-teal-700 px-5 py-2 text-sm font-semibold text-white hover:bg-teal-800">Aplicar filtros</button></div>
+            <div class="mt-4 flex flex-wrap justify-end gap-3">
+                <button class="rounded-lg bg-teal-700 px-5 py-2 text-sm font-semibold text-white hover:bg-teal-800">Aplicar filtros</button>
+                @if ($canExport)
+                    <a href="{{ route('reports.meetings.export', request()->query()) }}" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Exportar CSV</a>
+                @endif
+            </div>
         </form>
 
         @php
