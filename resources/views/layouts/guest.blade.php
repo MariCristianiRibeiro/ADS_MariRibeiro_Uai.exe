@@ -24,14 +24,13 @@
                     <a href="/" aria-label="Uai - início">
                         <x-application-logo class="text-5xl text-teal-700" />
                     </a>
-                    <p class="text-sm font-medium tracking-wide text-slate-500">seu tempo vale muito</p>
                 </div>
 
                 <div class="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xl shadow-slate-200/60 sm:p-9">
                     {{ $slot }}
                 </div>
 
-                <p class="mt-6 text-center text-xs text-slate-400">Organize sua rotina com mais leveza.</p>
+                <p class="mt-6 text-center text-xs text-slate-400">Seu tempo vale muito!</p>
             </div>
         </main>
     </body>

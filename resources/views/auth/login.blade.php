@@ -1,8 +1,6 @@
 <x-guest-layout>
     <div class="mb-8">
-        <p class="text-xs font-bold uppercase tracking-[0.18em] text-teal-700">Bem-vindo ao Uai</p>
-        <h1 class="mt-3 text-3xl font-bold tracking-tight text-slate-900">Acesse sua conta</h1>
-        <p class="mt-2 text-sm leading-6 text-slate-500">Entre para continuar de onde parou.</p>
+        <p class="text-xs font-bold uppercase tracking-[0.18em] text-teal-700">Bem-vindo</p>
     </div>
 
     <x-auth-session-status class="mb-5 rounded-xl bg-teal-50 px-4 py-3 text-sm text-teal-800" :status="session('status')" />
