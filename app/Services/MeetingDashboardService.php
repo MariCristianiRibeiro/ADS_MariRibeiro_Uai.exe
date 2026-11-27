@@ -36,7 +36,7 @@ class MeetingDashboardService
             ->sum(fn (Meeting $meeting): float => $this->costs->estimatedTotal($meeting) * $this->monthlyOccurrences($meeting)) : null;
         $recurringAnnualProjection = $canViewCosts ? $meetings->filter(fn (Meeting $meeting): bool => $meeting->recurrence_type === 'recurring')
             ->sum(fn (Meeting $meeting): float => $this->costs->estimatedTotal($meeting) * $this->annualOccurrences($meeting)) : null;
-        $financial = $canViewCosts ? $this->financialBreakdowns($meetings, $user->hasPermission('reports.individuals')) : [];
+        $financial = $canViewCosts ? $this->financialBreakdowns($meetings, $user->hasPermission('reports.individuals'), $filters) : [];
         $completedDurations = $completed->filter(fn (MeetingActionItem $item): bool => $item->completed_at !== null);
         $productivityScores = $meetings->map(fn (Meeting $meeting) => $meeting->conclusion?->productivity_score)->filter(fn ($score) => $score !== null);
         $additionalMeetings = $actionItems->pluck('follow_up_meeting_id')->filter()->unique()->count();
@@ -163,7 +163,7 @@ class MeetingDashboardService
         ];
     }
 
-    private function financialBreakdowns(Collection $meetings, bool $canViewIndividuals): array
+    private function financialBreakdowns(Collection $meetings, bool $canViewIndividuals, array $filters): array
     {
         $realMeetings = $meetings->filter(fn (Meeting $meeting): bool => $meeting->actual_duration_seconds !== null);
         $byMeetingDimension = function (callable $label) use ($realMeetings): array {
@@ -176,6 +176,12 @@ class MeetingDashboardService
         $directorateCosts = [];
         foreach ($realMeetings as $meeting) {
             if ($meeting->meetingParticipants->isEmpty()) {
+                if (! empty($filters['department']) && (string) ($meeting->project?->team_id ?? '') !== (string) $filters['department']) {
+                    continue;
+                }
+                if (! empty($filters['directorate']) && (string) ($meeting->project?->team?->directorate_id ?? '') !== (string) $filters['directorate']) {
+                    continue;
+                }
                 $department = $meeting->project?->team?->name ?? 'Sem departamento';
                 $directorate = $meeting->project?->team?->directorate?->name ?? 'Sem diretoria';
                 $cost = $this->costs->total($meeting);
@@ -185,6 +191,14 @@ class MeetingDashboardService
                 continue;
             }
             foreach ($meeting->meetingParticipants->filter(fn ($participant): bool => in_array($participant->attendance_status, ['confirmed', 'present'], true)) as $participant) {
+                $participantTeamId = $participant->costSnapshot?->team_id ?? $participant->user?->team_id;
+                $participantDirectorateId = $participant->costSnapshot?->directorate_id ?? $participant->user?->directorate_id;
+                if (! empty($filters['department']) && (string) $participantTeamId !== (string) $filters['department']) {
+                    continue;
+                }
+                if (! empty($filters['directorate']) && (string) $participantDirectorateId !== (string) $filters['directorate']) {
+                    continue;
+                }
                 $rate = (float) ($participant->costSnapshot?->hourly_rate ?? ($participant->user ? $this->costs->userRate($participant->user) : 0));
                 $cost = $meeting->actual_duration_seconds / 3600 * $rate;
                 $this->appendCostGroup($departmentCosts, $participant->costSnapshot?->team?->name ?? $participant->user?->team?->name ?? 'Sem departamento', $cost);

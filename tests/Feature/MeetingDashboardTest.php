@@ -1,8 +1,11 @@
 <?php
 
+use App\Models\Directorate;
 use App\Models\Meeting;
 use App\Models\MeetingActionItem;
 use App\Models\MeetingConclusion;
+use App\Models\Project;
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -53,6 +56,36 @@ it('applies date and category filters within the user visible meeting scope', fu
     $this->actingAs($organizer)->get(route('reports.meetings.dashboard', [
         'date_from' => '2026-11-01', 'date_to' => '2026-11-30', 'category' => 'Planning',
     ]))->assertOk()->assertViewHas('metrics', fn (array $metrics): bool => $metrics['meeting_count'] === 1);
+});
+
+it('compares dimensions without filters and restricts financial dimensions to a selected department', function () {
+    $organizer = createUserWithPermissions(['reports.view', 'reports.costs'], ['role' => 'executive']);
+    $directorate = Directorate::create(['name' => 'Diretoria Geral', 'code' => 'DG', 'active' => true]);
+    $teamA = Team::create(['directorate_id' => $directorate->id, 'name' => 'Equipe Alfa', 'code' => 'ALFA', 'active' => true]);
+    $teamB = Team::create(['directorate_id' => $directorate->id, 'name' => 'Equipe Beta', 'code' => 'BETA', 'active' => true]);
+    $projectA = Project::create(['team_id' => $teamA->id, 'name' => 'Projeto Alfa', 'code' => 'PROJ-ALFA', 'status' => 'active']);
+    $participantA = User::factory()->create(['team_id' => $teamA->id, 'directorate_id' => $directorate->id, 'hourly_rate' => 100]);
+    $participantB = User::factory()->create(['team_id' => $teamB->id, 'directorate_id' => $directorate->id, 'hourly_rate' => 200]);
+
+    $meeting = meetingDashboardFixture($organizer, ['project_id' => $projectA->id]);
+    $meeting->users()->attach($participantA->id, ['attendance_status' => 'present']);
+    $meeting->users()->attach($participantB->id, ['attendance_status' => 'present']);
+
+    $this->actingAs($organizer)
+        ->get(route('reports.meetings.dashboard'))
+        ->assertOk()
+        ->assertViewHas('financial.department', function (array $departments) use ($teamA, $teamB): bool {
+            $labels = collect($departments)->pluck('label')->all();
+
+            return in_array($teamA->name, $labels, true) && in_array($teamB->name, $labels, true);
+        });
+
+    $this->actingAs($organizer)
+        ->get(route('reports.meetings.dashboard', ['department' => $teamA->id]))
+        ->assertOk()
+        ->assertViewHas('financial.department', function (array $departments) use ($teamA): bool {
+            return collect($departments)->pluck('label')->all() === [$teamA->name];
+        });
 });
 
 it('exports aggregated monthly data only to users with export permission', function () {
