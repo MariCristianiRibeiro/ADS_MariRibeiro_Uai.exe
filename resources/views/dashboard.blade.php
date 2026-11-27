@@ -41,9 +41,14 @@
                                 </div>
                                 <div class="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                     <p class="font-mono text-5xl font-bold tabular-nums tracking-tight text-white sm:text-6xl" aria-live="off" x-text="formatTime()">00:00:00</p>
-                                    <button type="button" x-show="isRunning || canStart" x-on:click="isRunning ? stop() : start()" x-bind:disabled="processing" class="inline-flex h-12 w-full shrink-0 items-center justify-center rounded-md border border-teal-300/40 bg-teal-700 px-[1.1rem] text-sm font-bold text-white shadow-sm transition hover:bg-teal-600 disabled:cursor-wait disabled:opacity-60 sm:w-48">
-                                        <span x-text="isRunning ? 'Pausar' : (selectedMeeting?.actualDurationSeconds > 0 ? 'Retomar cronômetro' : 'Iniciar cronômetro')">Iniciar cronômetro</span>
-                                    </button>
+                                    <div class="flex w-full flex-col gap-2 sm:w-48">
+                                        <button type="button" x-show="isRunning || canStart" x-on:click="isRunning ? stop() : start()" x-bind:disabled="processing" class="inline-flex h-12 w-full shrink-0 items-center justify-center rounded-md border border-teal-300/40 bg-teal-700 px-[1.1rem] text-sm font-bold text-white shadow-sm transition hover:bg-teal-600 disabled:cursor-wait disabled:opacity-60">
+                                            <span x-text="isRunning ? 'Pausar' : (selectedMeeting?.actualDurationSeconds > 0 ? 'Retomar cronômetro' : 'Iniciar cronômetro')">Iniciar cronômetro</span>
+                                        </button>
+                                        <button type="button" x-show="canFinish" x-on:click="finish()" x-bind:disabled="processing" class="inline-flex h-12 w-full items-center justify-center rounded-md border border-red-200 bg-white px-[1.1rem] text-sm font-bold text-red-700 shadow-sm transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-60">
+                                            <span x-text="processingAction === 'finish' ? 'Finalizando...' : 'Finalizar'">Finalizar</span>
+                                        </button>
+                                    </div>
                                 </div>
                                 <p class="mt-2 text-sm text-slate-400"><span x-text="attendedCount"></span> <span x-text="attendedCount === 1 ? 'presença contabilizada' : 'presenças contabilizadas'"></span></p>
                             </div>
@@ -59,9 +64,6 @@
                                     <a x-bind:href="selectedMeeting?.closeoutUrl" class="dashboard-action justify-center">Encerrar agenda</a>
                                     <a x-bind:href="selectedMeeting?.editUrl" class="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-800 shadow-sm transition hover:bg-slate-50">Reagendar agenda</a>
                                 </div>
-                                <button type="button" x-show="canFinish" x-on:click="finish()" x-bind:disabled="processing" class="inline-flex h-12 w-full items-center justify-center rounded-md border border-red-200 bg-white px-[1.1rem] text-sm font-bold text-red-700 shadow-sm transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-60 sm:w-60">
-                                    <span x-text="processingAction === 'finish' ? 'Finalizando...' : 'Finalizar'">Finalizar</span>
-                                </button>
                             </div>
                         </div>
                     </div>
