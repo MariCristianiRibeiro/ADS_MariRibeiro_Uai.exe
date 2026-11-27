@@ -30,7 +30,8 @@ class TeamController extends Controller
                 }))
                 ->orderBy('directorate_id')
                 ->orderBy('name')
-                ->get(),
+                ->paginate(10)
+                ->withQueryString(),
             'search' => $search,
         ]);
     }

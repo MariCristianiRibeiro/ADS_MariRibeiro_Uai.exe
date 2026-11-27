@@ -60,7 +60,7 @@ class MeetingController extends Controller
         }
 
         return view('meetings.index', [
-            'meetings' => $query->with(['project', 'users', 'participants'])->get(),
+            'meetings' => $query->with(['project', 'users', 'participants'])->paginate(10)->withQueryString(),
             'search' => $request->search ?? '',
             'statusFilter' => $request->status ?? 'all',
         ]);

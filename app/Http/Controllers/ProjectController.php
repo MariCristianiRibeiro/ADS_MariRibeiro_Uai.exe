@@ -24,7 +24,7 @@ class ProjectController extends Controller
         }
 
         return view('projects.index', [
-            'projects' => $projectsQuery->get(),
+            'projects' => $projectsQuery->paginate(10)->withQueryString(),
             'search' => $search,
         ]);
     }

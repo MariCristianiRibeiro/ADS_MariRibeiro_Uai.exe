@@ -86,6 +86,7 @@
                         </tbody>
                     </table>
                 </div>
+                <div class="mt-4">{{ $meetings->links() }}</div>
             </div>
         </div>
     </div>

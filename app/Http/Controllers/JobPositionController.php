@@ -14,7 +14,7 @@ class JobPositionController extends Controller
     public function index(Request $request): View
     {
         $positions = JobPosition::withCount('users')->when($request->filled('search'), fn ($query) => $query->whereRaw('LOWER(name) LIKE ?', ['%'.mb_strtolower(trim($request->search)).'%']))
-            ->orderBy('name')->paginate(15)->withQueryString();
+            ->orderBy('name')->paginate(10)->withQueryString();
 
         return view('job-positions.index', compact('positions'));
     }

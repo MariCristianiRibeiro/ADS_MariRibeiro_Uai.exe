@@ -16,7 +16,7 @@ class AccessControlAuditController extends Controller
             ->with(['actor', 'subject', 'accessProfile', 'permission'])
             ->latest('created_at')
             ->latest('id')
-            ->paginate(50);
+            ->paginate(10);
 
         return view('access-profiles.audit', compact('audits'));
     }

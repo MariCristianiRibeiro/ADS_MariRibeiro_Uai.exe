@@ -509,6 +509,24 @@ it('requires authentication to start a meeting timer', function () {
         ->assertUnauthorized();
 });
 
+it('administrator profile can cancel a meeting created by another user', function () {
+    $admin = createAdminUser(['status' => 'active']);
+    $owner = User::factory()->create();
+    $meeting = Meeting::create([
+        'user_id' => $owner->id,
+        'organizer_id' => $owner->id,
+        'title' => 'Reunião pendente',
+        'date' => '2026-12-16',
+        'status' => 'scheduled',
+    ]);
+
+    $this->actingAs($admin)
+        ->patch(route('meetings.cancel', $meeting))
+        ->assertRedirect(route('meetings.index'));
+
+    expect($meeting->fresh()->status)->toBe('canceled');
+});
+
 it('does not start a canceled meeting timer', function () {
     $owner = createUserWithPermissions(['meetings.view', 'meetings.edit']);
     $meeting = Meeting::create([
