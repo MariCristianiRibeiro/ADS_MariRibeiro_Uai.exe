@@ -23,12 +23,12 @@
                             @endforeach
                         </select>
 
-                        <div class="mt-6 grid gap-6 rounded-xl bg-slate-950 p-6 text-white shadow-lg {{ $canViewCosts ? 'sm:grid-cols-2' : '' }} sm:items-center sm:p-8">
+                        <div class="mt-6 grid gap-6 rounded-xl bg-slate-950 p-6 text-white shadow-lg {{ $canViewCosts ? 'sm:grid-cols-2' : '' }} sm:items-start sm:p-8">
                             @if ($canViewCosts)
                                 <div>
                                     <p class="text-sm font-semibold uppercase tracking-[0.18em] text-teal-300">Investimento acumulado</p>
-                                    <p class="mt-3 text-5xl font-bold tabular-nums tracking-tight text-white sm:text-6xl lg:text-7xl" x-text="formatCurrency(investedValue)">R$ 0,00</p>
-                                    <p class="mt-2 text-xs text-slate-400">Com base nas presenças confirmadas.</p>
+                                    <p class="mt-3 text-5xl font-bold tabular-nums tracking-tight text-white sm:min-h-[3.75rem] sm:text-6xl lg:min-h-[4.5rem] lg:text-7xl" x-text="formatCurrency(investedValue)">R$ 0,00</p>
+                                    <p class="mt-2 text-xs text-slate-400"><span x-text="attendedCount"></span> <span x-text="attendedCount === 1 ? 'presença contabilizada' : 'presenças contabilizadas'"></span></p>
                                 </div>
                             @endif
                             <div>
@@ -39,8 +39,11 @@
                                     </span>
                                     <span>Tempo decorrido</span>
                                 </div>
-                                <div class="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                                    <p class="font-mono text-5xl font-bold tabular-nums tracking-tight text-white sm:text-6xl" aria-live="off" x-text="formatTime()">00:00:00</p>
+                                <div class="mt-3 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                    <div class="min-w-0">
+                                        <p class="font-mono text-5xl font-bold tabular-nums tracking-tight text-white sm:min-h-[3.75rem] sm:text-6xl lg:min-h-[4.5rem]" aria-live="off" x-text="formatTime()">00:00:00</p>
+                                        <p class="mt-2 text-xs text-slate-400">Com base nas presenças confirmadas.</p>
+                                    </div>
                                     <div class="flex w-full flex-col gap-2 sm:w-48">
                                         <button type="button" x-show="isRunning || canStart" x-on:click="isRunning ? stop() : start()" x-bind:disabled="processing" class="inline-flex h-12 w-full shrink-0 items-center justify-center rounded-md border border-teal-300/40 bg-teal-700 px-[1.1rem] text-sm font-bold text-white shadow-sm transition hover:bg-teal-600 disabled:cursor-wait disabled:opacity-60">
                                             <span x-text="isRunning ? 'Pausar' : (selectedMeeting?.actualDurationSeconds > 0 ? 'Retomar cronômetro' : 'Iniciar cronômetro')">Iniciar cronômetro</span>
@@ -50,7 +53,6 @@
                                         </button>
                                     </div>
                                 </div>
-                                <p class="mt-2 text-sm text-slate-400"><span x-text="attendedCount"></span> <span x-text="attendedCount === 1 ? 'presença contabilizada' : 'presenças contabilizadas'"></span></p>
                             </div>
                         </div>
 
