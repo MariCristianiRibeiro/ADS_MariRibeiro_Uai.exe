@@ -21,6 +21,34 @@ it('user can view meeting management page', function () {
         ->assertOk();
 });
 
+it('administrator profile can view meetings created by other users', function () {
+    $admin = createAdminUser(['status' => 'active']);
+    $otherUser = User::factory()->create();
+
+    $ownMeeting = Meeting::create([
+        'user_id' => $admin->id,
+        'title' => 'Reunião do administrador',
+        'date' => '2026-12-16',
+        'status' => 'scheduled',
+    ]);
+    $otherMeeting = Meeting::create([
+        'user_id' => $otherUser->id,
+        'title' => 'Reunião criada por outro usuário',
+        'date' => '2026-12-16',
+        'status' => 'scheduled',
+    ]);
+
+    $this->actingAs($admin)
+        ->get('/meetings')
+        ->assertOk()
+        ->assertSee('Reunião do administrador')
+        ->assertSee('Reunião criada por outro usuário')
+        ->assertViewHas('meetings', function ($meetings) use ($ownMeeting, $otherMeeting): bool {
+            return $meetings->pluck('id')->sort()->values()->all()
+                === collect([$ownMeeting->id, $otherMeeting->id])->sort()->values()->all();
+        });
+});
+
 it('dashboard lists only meetings created by the signed-in user', function () {
     $owner = createUserWithPermissions(['meetings.view', 'meetings.edit']);
     $otherUser = User::factory()->create();

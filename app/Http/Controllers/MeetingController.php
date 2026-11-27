@@ -32,7 +32,19 @@ class MeetingController extends Controller
     {
         abort_unless($request->user()->hasPermission('meetings.view'), 403);
 
-        $query = Meeting::where('user_id', Auth::id())->latest();
+        $query = Meeting::query()->latest();
+
+        $canViewAllMeetings = $request->user()->isAdmin()
+            || $request->user()->hasPermission('access_profiles.administer');
+
+        if (! $canViewAllMeetings) {
+            $query->where(function ($scope): void {
+                $scope->where('user_id', Auth::id())
+                    ->orWhere('organizer_id', Auth::id())
+                    ->orWhereHas('users', fn ($users) => $users->where('users.id', Auth::id()))
+                    ->orWhereHas('meetingParticipants', fn ($participants) => $participants->where('user_id', Auth::id()));
+            });
+        }
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -571,8 +583,7 @@ class MeetingController extends Controller
     public function edit(Meeting $meeting, MeetingCostCalculator $costCalculator): View
     {
         abort_unless(Auth::user()->hasPermission('meetings.edit'), 403);
-
-        abort_unless($meeting->user_id === Auth::id(), 403);
+        abort_unless($this->canManageMeetingRecord(Auth::user(), $meeting), 403);
 
         $meeting->load(['users.jobPosition', 'users.participantProfile', 'meetingParticipants.costSnapshot']);
         $members = $this->availableMembers();
@@ -594,8 +605,7 @@ class MeetingController extends Controller
         MeetingPredictionService $predictions,
     ): RedirectResponse {
         abort_unless($request->user()->hasPermission('meetings.edit'), 403);
-
-        abort_unless($meeting->user_id === Auth::id(), 403);
+        abort_unless($this->canManageMeetingRecord($request->user(), $meeting), 403);
 
         $request->merge([
             'duration_minutes' => $request->input('duration_minutes', $meeting->duration_minutes ?: 60),
@@ -636,8 +646,7 @@ class MeetingController extends Controller
     public function destroy(Meeting $meeting): RedirectResponse
     {
         abort_unless(Auth::user()->hasPermission('meetings.delete'), 403);
-
-        abort_unless($meeting->user_id === Auth::id(), 403);
+        abort_unless($this->canManageMeetingRecord(Auth::user(), $meeting), 403);
 
         $meeting->update(['status' => 'canceled']);
 
@@ -1170,9 +1179,17 @@ class MeetingController extends Controller
     {
         abort_unless($request->user()->hasPermission('meetings.edit'), 403);
         abort_unless(
-            $meeting->user_id === $request->user()->id || $meeting->organizer_id === $request->user()->id,
+            $this->canManageMeetingRecord($request->user(), $meeting),
             403,
         );
+    }
+
+    private function canManageMeetingRecord(User $user, Meeting $meeting): bool
+    {
+        return $meeting->user_id === $user->id
+            || $meeting->organizer_id === $user->id
+            || $user->isAdmin()
+            || $user->hasPermission('access_profiles.administer');
     }
 
     private function syncParticipants(
